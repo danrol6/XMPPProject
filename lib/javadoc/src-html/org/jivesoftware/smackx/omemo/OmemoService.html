@@ -1,0 +1,1441 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/**<a name="line.1"></a>
+<span class="sourceLineNo">002</span> *<a name="line.2"></a>
+<span class="sourceLineNo">003</span> * Copyright 2017 Paul Schaub<a name="line.3"></a>
+<span class="sourceLineNo">004</span> *<a name="line.4"></a>
+<span class="sourceLineNo">005</span> * Licensed under the Apache License, Version 2.0 (the "License");<a name="line.5"></a>
+<span class="sourceLineNo">006</span> * you may not use this file except in compliance with the License.<a name="line.6"></a>
+<span class="sourceLineNo">007</span> * You may obtain a copy of the License at<a name="line.7"></a>
+<span class="sourceLineNo">008</span> *<a name="line.8"></a>
+<span class="sourceLineNo">009</span> *     http://www.apache.org/licenses/LICENSE-2.0<a name="line.9"></a>
+<span class="sourceLineNo">010</span> *<a name="line.10"></a>
+<span class="sourceLineNo">011</span> * Unless required by applicable law or agreed to in writing, software<a name="line.11"></a>
+<span class="sourceLineNo">012</span> * distributed under the License is distributed on an "AS IS" BASIS,<a name="line.12"></a>
+<span class="sourceLineNo">013</span> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<a name="line.13"></a>
+<span class="sourceLineNo">014</span> * See the License for the specific language governing permissions and<a name="line.14"></a>
+<span class="sourceLineNo">015</span> * limitations under the License.<a name="line.15"></a>
+<span class="sourceLineNo">016</span> */<a name="line.16"></a>
+<span class="sourceLineNo">017</span>package org.jivesoftware.smackx.omemo;<a name="line.17"></a>
+<span class="sourceLineNo">018</span><a name="line.18"></a>
+<span class="sourceLineNo">019</span>import static org.jivesoftware.smackx.omemo.util.OmemoConstants.OMEMO_NAMESPACE_V_AXOLOTL;<a name="line.19"></a>
+<span class="sourceLineNo">020</span>import static org.jivesoftware.smackx.omemo.util.OmemoConstants.PEP_NODE_BUNDLE_FROM_DEVICE_ID;<a name="line.20"></a>
+<span class="sourceLineNo">021</span>import static org.jivesoftware.smackx.omemo.util.OmemoConstants.PEP_NODE_DEVICE_LIST;<a name="line.21"></a>
+<span class="sourceLineNo">022</span><a name="line.22"></a>
+<span class="sourceLineNo">023</span>import java.io.UnsupportedEncodingException;<a name="line.23"></a>
+<span class="sourceLineNo">024</span>import java.security.InvalidAlgorithmParameterException;<a name="line.24"></a>
+<span class="sourceLineNo">025</span>import java.security.InvalidKeyException;<a name="line.25"></a>
+<span class="sourceLineNo">026</span>import java.security.NoSuchAlgorithmException;<a name="line.26"></a>
+<span class="sourceLineNo">027</span>import java.security.NoSuchProviderException;<a name="line.27"></a>
+<span class="sourceLineNo">028</span>import java.security.Security;<a name="line.28"></a>
+<span class="sourceLineNo">029</span>import java.util.ArrayList;<a name="line.29"></a>
+<span class="sourceLineNo">030</span>import java.util.Collections;<a name="line.30"></a>
+<span class="sourceLineNo">031</span>import java.util.Date;<a name="line.31"></a>
+<span class="sourceLineNo">032</span>import java.util.HashMap;<a name="line.32"></a>
+<span class="sourceLineNo">033</span>import java.util.HashSet;<a name="line.33"></a>
+<span class="sourceLineNo">034</span>import java.util.Iterator;<a name="line.34"></a>
+<span class="sourceLineNo">035</span>import java.util.List;<a name="line.35"></a>
+<span class="sourceLineNo">036</span>import java.util.Map;<a name="line.36"></a>
+<span class="sourceLineNo">037</span>import java.util.Random;<a name="line.37"></a>
+<span class="sourceLineNo">038</span>import java.util.Set;<a name="line.38"></a>
+<span class="sourceLineNo">039</span>import java.util.logging.Level;<a name="line.39"></a>
+<span class="sourceLineNo">040</span>import java.util.logging.Logger;<a name="line.40"></a>
+<span class="sourceLineNo">041</span>import javax.crypto.BadPaddingException;<a name="line.41"></a>
+<span class="sourceLineNo">042</span>import javax.crypto.IllegalBlockSizeException;<a name="line.42"></a>
+<span class="sourceLineNo">043</span>import javax.crypto.NoSuchPaddingException;<a name="line.43"></a>
+<span class="sourceLineNo">044</span><a name="line.44"></a>
+<span class="sourceLineNo">045</span>import org.jivesoftware.smack.SmackException;<a name="line.45"></a>
+<span class="sourceLineNo">046</span>import org.jivesoftware.smack.StanzaListener;<a name="line.46"></a>
+<span class="sourceLineNo">047</span>import org.jivesoftware.smack.XMPPException;<a name="line.47"></a>
+<span class="sourceLineNo">048</span>import org.jivesoftware.smack.filter.StanzaFilter;<a name="line.48"></a>
+<span class="sourceLineNo">049</span>import org.jivesoftware.smack.packet.Message;<a name="line.49"></a>
+<span class="sourceLineNo">050</span>import org.jivesoftware.smack.packet.Stanza;<a name="line.50"></a>
+<span class="sourceLineNo">051</span>import org.jivesoftware.smack.packet.StanzaError;<a name="line.51"></a>
+<span class="sourceLineNo">052</span>import org.jivesoftware.smack.util.Async;<a name="line.52"></a>
+<span class="sourceLineNo">053</span><a name="line.53"></a>
+<span class="sourceLineNo">054</span>import org.jivesoftware.smackx.carbons.CarbonCopyReceivedListener;<a name="line.54"></a>
+<span class="sourceLineNo">055</span>import org.jivesoftware.smackx.carbons.CarbonManager;<a name="line.55"></a>
+<span class="sourceLineNo">056</span>import org.jivesoftware.smackx.carbons.packet.CarbonExtension;<a name="line.56"></a>
+<span class="sourceLineNo">057</span>import org.jivesoftware.smackx.mam.MamManager;<a name="line.57"></a>
+<span class="sourceLineNo">058</span>import org.jivesoftware.smackx.muc.MultiUserChat;<a name="line.58"></a>
+<span class="sourceLineNo">059</span>import org.jivesoftware.smackx.muc.MultiUserChatManager;<a name="line.59"></a>
+<span class="sourceLineNo">060</span>import org.jivesoftware.smackx.omemo.element.OmemoBundleVAxolotlElement;<a name="line.60"></a>
+<span class="sourceLineNo">061</span>import org.jivesoftware.smackx.omemo.element.OmemoDeviceListElement;<a name="line.61"></a>
+<span class="sourceLineNo">062</span>import org.jivesoftware.smackx.omemo.element.OmemoDeviceListVAxolotlElement;<a name="line.62"></a>
+<span class="sourceLineNo">063</span>import org.jivesoftware.smackx.omemo.element.OmemoElement;<a name="line.63"></a>
+<span class="sourceLineNo">064</span>import org.jivesoftware.smackx.omemo.element.OmemoVAxolotlElement;<a name="line.64"></a>
+<span class="sourceLineNo">065</span>import org.jivesoftware.smackx.omemo.exceptions.CannotEstablishOmemoSessionException;<a name="line.65"></a>
+<span class="sourceLineNo">066</span>import org.jivesoftware.smackx.omemo.exceptions.CorruptedOmemoKeyException;<a name="line.66"></a>
+<span class="sourceLineNo">067</span>import org.jivesoftware.smackx.omemo.exceptions.CryptoFailedException;<a name="line.67"></a>
+<span class="sourceLineNo">068</span>import org.jivesoftware.smackx.omemo.exceptions.NoRawSessionException;<a name="line.68"></a>
+<span class="sourceLineNo">069</span>import org.jivesoftware.smackx.omemo.exceptions.UndecidedOmemoIdentityException;<a name="line.69"></a>
+<span class="sourceLineNo">070</span>import org.jivesoftware.smackx.omemo.internal.CachedDeviceList;<a name="line.70"></a>
+<span class="sourceLineNo">071</span>import org.jivesoftware.smackx.omemo.internal.CipherAndAuthTag;<a name="line.71"></a>
+<span class="sourceLineNo">072</span>import org.jivesoftware.smackx.omemo.internal.ClearTextMessage;<a name="line.72"></a>
+<span class="sourceLineNo">073</span>import org.jivesoftware.smackx.omemo.internal.IdentityKeyWrapper;<a name="line.73"></a>
+<span class="sourceLineNo">074</span>import org.jivesoftware.smackx.omemo.internal.OmemoDevice;<a name="line.74"></a>
+<span class="sourceLineNo">075</span>import org.jivesoftware.smackx.omemo.internal.OmemoMessageInformation;<a name="line.75"></a>
+<span class="sourceLineNo">076</span>import org.jivesoftware.smackx.omemo.internal.OmemoSession;<a name="line.76"></a>
+<span class="sourceLineNo">077</span>import org.jivesoftware.smackx.omemo.util.OmemoConstants;<a name="line.77"></a>
+<span class="sourceLineNo">078</span>import org.jivesoftware.smackx.omemo.util.OmemoMessageBuilder;<a name="line.78"></a>
+<span class="sourceLineNo">079</span>import org.jivesoftware.smackx.pubsub.LeafNode;<a name="line.79"></a>
+<span class="sourceLineNo">080</span>import org.jivesoftware.smackx.pubsub.PayloadItem;<a name="line.80"></a>
+<span class="sourceLineNo">081</span>import org.jivesoftware.smackx.pubsub.PubSubException;<a name="line.81"></a>
+<span class="sourceLineNo">082</span>import org.jivesoftware.smackx.pubsub.PubSubException.NotAPubSubNodeException;<a name="line.82"></a>
+<span class="sourceLineNo">083</span>import org.jivesoftware.smackx.pubsub.PubSubManager;<a name="line.83"></a>
+<span class="sourceLineNo">084</span><a name="line.84"></a>
+<span class="sourceLineNo">085</span>import org.bouncycastle.jce.provider.BouncyCastleProvider;<a name="line.85"></a>
+<span class="sourceLineNo">086</span>import org.jxmpp.jid.BareJid;<a name="line.86"></a>
+<span class="sourceLineNo">087</span>import org.jxmpp.jid.Jid;<a name="line.87"></a>
+<span class="sourceLineNo">088</span><a name="line.88"></a>
+<span class="sourceLineNo">089</span>/**<a name="line.89"></a>
+<span class="sourceLineNo">090</span> * This class contains OMEMO related logic and registers listeners etc.<a name="line.90"></a>
+<span class="sourceLineNo">091</span> *<a name="line.91"></a>
+<span class="sourceLineNo">092</span> * @param &lt;T_IdKeyPair&gt; IdentityKeyPair class<a name="line.92"></a>
+<span class="sourceLineNo">093</span> * @param &lt;T_IdKey&gt;     IdentityKey class<a name="line.93"></a>
+<span class="sourceLineNo">094</span> * @param &lt;T_PreKey&gt;    PreKey class<a name="line.94"></a>
+<span class="sourceLineNo">095</span> * @param &lt;T_SigPreKey&gt; SignedPreKey class<a name="line.95"></a>
+<span class="sourceLineNo">096</span> * @param &lt;T_Sess&gt;      Session class<a name="line.96"></a>
+<span class="sourceLineNo">097</span> * @param &lt;T_Addr&gt;      Address class<a name="line.97"></a>
+<span class="sourceLineNo">098</span> * @param &lt;T_ECPub&gt;     Elliptic Curve PublicKey class<a name="line.98"></a>
+<span class="sourceLineNo">099</span> * @param &lt;T_Bundle&gt;    Bundle class<a name="line.99"></a>
+<span class="sourceLineNo">100</span> * @param &lt;T_Ciph&gt;      Cipher class<a name="line.100"></a>
+<span class="sourceLineNo">101</span> * @author Paul Schaub<a name="line.101"></a>
+<span class="sourceLineNo">102</span> */<a name="line.102"></a>
+<span class="sourceLineNo">103</span>public abstract class OmemoService&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; {<a name="line.103"></a>
+<span class="sourceLineNo">104</span><a name="line.104"></a>
+<span class="sourceLineNo">105</span>    static {<a name="line.105"></a>
+<span class="sourceLineNo">106</span>        Security.addProvider(new BouncyCastleProvider());<a name="line.106"></a>
+<span class="sourceLineNo">107</span>    }<a name="line.107"></a>
+<span class="sourceLineNo">108</span><a name="line.108"></a>
+<span class="sourceLineNo">109</span>    protected static final Logger LOGGER = Logger.getLogger(OmemoService.class.getName());<a name="line.109"></a>
+<span class="sourceLineNo">110</span><a name="line.110"></a>
+<span class="sourceLineNo">111</span>    private static OmemoService&lt;?, ?, ?, ?, ?, ?, ?, ?, ?&gt; INSTANCE;<a name="line.111"></a>
+<span class="sourceLineNo">112</span><a name="line.112"></a>
+<span class="sourceLineNo">113</span>    protected OmemoStore&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; omemoStore;<a name="line.113"></a>
+<span class="sourceLineNo">114</span><a name="line.114"></a>
+<span class="sourceLineNo">115</span>    public static OmemoService&lt;?, ?, ?, ?, ?, ?, ?, ?, ?&gt; getInstance() {<a name="line.115"></a>
+<span class="sourceLineNo">116</span>        if (INSTANCE == null) {<a name="line.116"></a>
+<span class="sourceLineNo">117</span>            throw new IllegalStateException("No OmemoService registered");<a name="line.117"></a>
+<span class="sourceLineNo">118</span>        }<a name="line.118"></a>
+<span class="sourceLineNo">119</span>        return INSTANCE;<a name="line.119"></a>
+<span class="sourceLineNo">120</span>    }<a name="line.120"></a>
+<span class="sourceLineNo">121</span><a name="line.121"></a>
+<span class="sourceLineNo">122</span>    /**<a name="line.122"></a>
+<span class="sourceLineNo">123</span>     * Set singleton instance. Throws an IllegalStateException, if there is already a service set as instance.<a name="line.123"></a>
+<span class="sourceLineNo">124</span>     *<a name="line.124"></a>
+<span class="sourceLineNo">125</span>     * @param omemoService instance<a name="line.125"></a>
+<span class="sourceLineNo">126</span>     */<a name="line.126"></a>
+<span class="sourceLineNo">127</span>    protected static void setInstance(OmemoService&lt;?, ?, ?, ?, ?, ?, ?, ?, ?&gt; omemoService) {<a name="line.127"></a>
+<span class="sourceLineNo">128</span>        if (INSTANCE != null) {<a name="line.128"></a>
+<span class="sourceLineNo">129</span>            throw new IllegalStateException("An OmemoService is already registered");<a name="line.129"></a>
+<span class="sourceLineNo">130</span>        }<a name="line.130"></a>
+<span class="sourceLineNo">131</span>        INSTANCE = omemoService;<a name="line.131"></a>
+<span class="sourceLineNo">132</span>    }<a name="line.132"></a>
+<span class="sourceLineNo">133</span><a name="line.133"></a>
+<span class="sourceLineNo">134</span>    public static boolean isServiceRegistered() {<a name="line.134"></a>
+<span class="sourceLineNo">135</span>        return INSTANCE != null;<a name="line.135"></a>
+<span class="sourceLineNo">136</span>    }<a name="line.136"></a>
+<span class="sourceLineNo">137</span><a name="line.137"></a>
+<span class="sourceLineNo">138</span>    /**<a name="line.138"></a>
+<span class="sourceLineNo">139</span>     * Return the used omemoStore backend.<a name="line.139"></a>
+<span class="sourceLineNo">140</span>     * If there is no store backend set yet, set the default one (typically a file-based one).<a name="line.140"></a>
+<span class="sourceLineNo">141</span>     *<a name="line.141"></a>
+<span class="sourceLineNo">142</span>     * @return omemoStore backend<a name="line.142"></a>
+<span class="sourceLineNo">143</span>     */<a name="line.143"></a>
+<span class="sourceLineNo">144</span>    public OmemoStore&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.144"></a>
+<span class="sourceLineNo">145</span>    getOmemoStoreBackend() {<a name="line.145"></a>
+<span class="sourceLineNo">146</span>        if (omemoStore == null) {<a name="line.146"></a>
+<span class="sourceLineNo">147</span>            setOmemoStoreBackend(createDefaultOmemoStoreBackend());<a name="line.147"></a>
+<span class="sourceLineNo">148</span>            return getOmemoStoreBackend();<a name="line.148"></a>
+<span class="sourceLineNo">149</span>        }<a name="line.149"></a>
+<span class="sourceLineNo">150</span>        return omemoStore;<a name="line.150"></a>
+<span class="sourceLineNo">151</span>    }<a name="line.151"></a>
+<span class="sourceLineNo">152</span><a name="line.152"></a>
+<span class="sourceLineNo">153</span>    /**<a name="line.153"></a>
+<span class="sourceLineNo">154</span>     * Set an omemoStore as backend. Throws an IllegalStateException, if there is already a backend set.<a name="line.154"></a>
+<span class="sourceLineNo">155</span>     *<a name="line.155"></a>
+<span class="sourceLineNo">156</span>     * @param omemoStore store.<a name="line.156"></a>
+<span class="sourceLineNo">157</span>     */<a name="line.157"></a>
+<span class="sourceLineNo">158</span>    public void setOmemoStoreBackend(<a name="line.158"></a>
+<span class="sourceLineNo">159</span>            OmemoStore&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; omemoStore) {<a name="line.159"></a>
+<span class="sourceLineNo">160</span>        if (this.omemoStore != null) {<a name="line.160"></a>
+<span class="sourceLineNo">161</span>            throw new IllegalStateException("An OmemoStore backend has already been set.");<a name="line.161"></a>
+<span class="sourceLineNo">162</span>        }<a name="line.162"></a>
+<span class="sourceLineNo">163</span>        this.omemoStore = omemoStore;<a name="line.163"></a>
+<span class="sourceLineNo">164</span>    }<a name="line.164"></a>
+<span class="sourceLineNo">165</span><a name="line.165"></a>
+<span class="sourceLineNo">166</span>    /**<a name="line.166"></a>
+<span class="sourceLineNo">167</span>     * Create a default OmemoStore object.<a name="line.167"></a>
+<span class="sourceLineNo">168</span>     *<a name="line.168"></a>
+<span class="sourceLineNo">169</span>     * @return default omemoStore.<a name="line.169"></a>
+<span class="sourceLineNo">170</span>     */<a name="line.170"></a>
+<span class="sourceLineNo">171</span>    public abstract OmemoStore&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.171"></a>
+<span class="sourceLineNo">172</span>    createDefaultOmemoStoreBackend();<a name="line.172"></a>
+<span class="sourceLineNo">173</span><a name="line.173"></a>
+<span class="sourceLineNo">174</span>    /**<a name="line.174"></a>
+<span class="sourceLineNo">175</span>     * Create a new OmemoService object. This should only happen once.<a name="line.175"></a>
+<span class="sourceLineNo">176</span>     * When the service gets created, it tries a placeholder crypto function in order to test, if all necessary<a name="line.176"></a>
+<span class="sourceLineNo">177</span>     * algorithms are available on the system.<a name="line.177"></a>
+<span class="sourceLineNo">178</span>     *<a name="line.178"></a>
+<span class="sourceLineNo">179</span>     * @throws NoSuchPaddingException               When no Cipher could be instantiated.<a name="line.179"></a>
+<span class="sourceLineNo">180</span>     * @throws NoSuchAlgorithmException             when no Cipher could be instantiated.<a name="line.180"></a>
+<span class="sourceLineNo">181</span>     * @throws NoSuchProviderException              when BouncyCastle could not be found.<a name="line.181"></a>
+<span class="sourceLineNo">182</span>     * @throws InvalidAlgorithmParameterException   when the Cipher could not be initialized<a name="line.182"></a>
+<span class="sourceLineNo">183</span>     * @throws InvalidKeyException                  when the generated key is invalid<a name="line.183"></a>
+<span class="sourceLineNo">184</span>     * @throws UnsupportedEncodingException         when UTF8 is unavailable<a name="line.184"></a>
+<span class="sourceLineNo">185</span>     * @throws BadPaddingException                  when cipher.doFinal gets wrong padding<a name="line.185"></a>
+<span class="sourceLineNo">186</span>     * @throws IllegalBlockSizeException            when cipher.doFinal gets wrong Block size.<a name="line.186"></a>
+<span class="sourceLineNo">187</span>     */<a name="line.187"></a>
+<span class="sourceLineNo">188</span>    public OmemoService()<a name="line.188"></a>
+<span class="sourceLineNo">189</span>            throws NoSuchPaddingException, InvalidKeyException, UnsupportedEncodingException, IllegalBlockSizeException,<a name="line.189"></a>
+<span class="sourceLineNo">190</span>            BadPaddingException, NoSuchAlgorithmException, NoSuchProviderException, InvalidAlgorithmParameterException {<a name="line.190"></a>
+<span class="sourceLineNo">191</span><a name="line.191"></a>
+<span class="sourceLineNo">192</span>        // Check availability of algorithms and encodings needed for crypto<a name="line.192"></a>
+<span class="sourceLineNo">193</span>        checkAvailableAlgorithms();<a name="line.193"></a>
+<span class="sourceLineNo">194</span>    }<a name="line.194"></a>
+<span class="sourceLineNo">195</span><a name="line.195"></a>
+<span class="sourceLineNo">196</span>    /**<a name="line.196"></a>
+<span class="sourceLineNo">197</span>     * Initialize OMEMO functionality for OmemoManager omemoManager.<a name="line.197"></a>
+<span class="sourceLineNo">198</span>     *<a name="line.198"></a>
+<span class="sourceLineNo">199</span>     * @param omemoManager OmemoManager we'd like to initialize.<a name="line.199"></a>
+<span class="sourceLineNo">200</span>     * @throws InterruptedException<a name="line.200"></a>
+<span class="sourceLineNo">201</span>     * @throws CorruptedOmemoKeyException<a name="line.201"></a>
+<span class="sourceLineNo">202</span>     * @throws XMPPException.XMPPErrorException<a name="line.202"></a>
+<span class="sourceLineNo">203</span>     * @throws SmackException.NotConnectedException<a name="line.203"></a>
+<span class="sourceLineNo">204</span>     * @throws SmackException.NoResponseException<a name="line.204"></a>
+<span class="sourceLineNo">205</span>     * @throws SmackException.NotLoggedInException<a name="line.205"></a>
+<span class="sourceLineNo">206</span>     * @throws PubSubException.NotALeafNodeException<a name="line.206"></a>
+<span class="sourceLineNo">207</span>     */<a name="line.207"></a>
+<span class="sourceLineNo">208</span>    void initialize(OmemoManager omemoManager) throws InterruptedException, CorruptedOmemoKeyException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, SmackException.NoResponseException, SmackException.NotLoggedInException, PubSubException.NotALeafNodeException {<a name="line.208"></a>
+<span class="sourceLineNo">209</span>        if (!omemoManager.getConnection().isAuthenticated()) {<a name="line.209"></a>
+<span class="sourceLineNo">210</span>            throw new SmackException.NotLoggedInException();<a name="line.210"></a>
+<span class="sourceLineNo">211</span>        }<a name="line.211"></a>
+<span class="sourceLineNo">212</span><a name="line.212"></a>
+<span class="sourceLineNo">213</span>        boolean mustPublishId = false;<a name="line.213"></a>
+<span class="sourceLineNo">214</span>        if (getOmemoStoreBackend().isFreshInstallation(omemoManager)) {<a name="line.214"></a>
+<span class="sourceLineNo">215</span>            LOGGER.log(Level.INFO, "No key material found. Looks like we have a fresh installation.");<a name="line.215"></a>
+<span class="sourceLineNo">216</span>            // Create new key material and publish it to the server<a name="line.216"></a>
+<span class="sourceLineNo">217</span>            regenerate(omemoManager, omemoManager.getDeviceId());<a name="line.217"></a>
+<span class="sourceLineNo">218</span>            mustPublishId = true;<a name="line.218"></a>
+<span class="sourceLineNo">219</span>        }<a name="line.219"></a>
+<span class="sourceLineNo">220</span><a name="line.220"></a>
+<span class="sourceLineNo">221</span>        // Get fresh device list from server<a name="line.221"></a>
+<span class="sourceLineNo">222</span>        mustPublishId |= refreshOwnDeviceList(omemoManager);<a name="line.222"></a>
+<span class="sourceLineNo">223</span><a name="line.223"></a>
+<span class="sourceLineNo">224</span>        publishDeviceIdIfNeeded(omemoManager, false, mustPublishId);<a name="line.224"></a>
+<span class="sourceLineNo">225</span>        publishBundle(omemoManager);<a name="line.225"></a>
+<span class="sourceLineNo">226</span><a name="line.226"></a>
+<span class="sourceLineNo">227</span>        registerOmemoMessageStanzaListeners(omemoManager);  //Wait for new OMEMO messages<a name="line.227"></a>
+<span class="sourceLineNo">228</span>        getOmemoStoreBackend().initializeOmemoSessions(omemoManager);   //Preload existing OMEMO sessions<a name="line.228"></a>
+<span class="sourceLineNo">229</span>    }<a name="line.229"></a>
+<span class="sourceLineNo">230</span><a name="line.230"></a>
+<span class="sourceLineNo">231</span>    /**<a name="line.231"></a>
+<span class="sourceLineNo">232</span>     * Test availability of required algorithms. We do this in advance, so we can simplify exception handling later.<a name="line.232"></a>
+<span class="sourceLineNo">233</span>     *<a name="line.233"></a>
+<span class="sourceLineNo">234</span>     * @throws NoSuchPaddingException<a name="line.234"></a>
+<span class="sourceLineNo">235</span>     * @throws UnsupportedEncodingException<a name="line.235"></a>
+<span class="sourceLineNo">236</span>     * @throws InvalidAlgorithmParameterException<a name="line.236"></a>
+<span class="sourceLineNo">237</span>     * @throws NoSuchAlgorithmException<a name="line.237"></a>
+<span class="sourceLineNo">238</span>     * @throws IllegalBlockSizeException<a name="line.238"></a>
+<span class="sourceLineNo">239</span>     * @throws BadPaddingException<a name="line.239"></a>
+<span class="sourceLineNo">240</span>     * @throws NoSuchProviderException<a name="line.240"></a>
+<span class="sourceLineNo">241</span>     * @throws InvalidKeyException<a name="line.241"></a>
+<span class="sourceLineNo">242</span>     */<a name="line.242"></a>
+<span class="sourceLineNo">243</span>    protected static void checkAvailableAlgorithms() throws NoSuchPaddingException, UnsupportedEncodingException,<a name="line.243"></a>
+<span class="sourceLineNo">244</span>            InvalidAlgorithmParameterException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException,<a name="line.244"></a>
+<span class="sourceLineNo">245</span>            NoSuchProviderException, InvalidKeyException {<a name="line.245"></a>
+<span class="sourceLineNo">246</span>        // Test crypto functions<a name="line.246"></a>
+<span class="sourceLineNo">247</span>        new OmemoMessageBuilder&lt;&gt;(null, null, "");<a name="line.247"></a>
+<span class="sourceLineNo">248</span>    }<a name="line.248"></a>
+<span class="sourceLineNo">249</span><a name="line.249"></a>
+<span class="sourceLineNo">250</span>    /**<a name="line.250"></a>
+<span class="sourceLineNo">251</span>     * Generate a new unique deviceId and regenerate new keys.<a name="line.251"></a>
+<span class="sourceLineNo">252</span>     *<a name="line.252"></a>
+<span class="sourceLineNo">253</span>     * @param omemoManager  OmemoManager we want to regenerate.<a name="line.253"></a>
+<span class="sourceLineNo">254</span>     * @param nDeviceId     new DeviceId we want to use with the newly generated keys.<a name="line.254"></a>
+<span class="sourceLineNo">255</span>     * @throws CorruptedOmemoKeyException when freshly generated identityKey is invalid<a name="line.255"></a>
+<span class="sourceLineNo">256</span>     *                                  (should never ever happen *crosses fingers*)<a name="line.256"></a>
+<span class="sourceLineNo">257</span>     */<a name="line.257"></a>
+<span class="sourceLineNo">258</span>    void regenerate(OmemoManager omemoManager, Integer nDeviceId) throws CorruptedOmemoKeyException {<a name="line.258"></a>
+<span class="sourceLineNo">259</span>        // Generate unique ID that is not already taken<a name="line.259"></a>
+<span class="sourceLineNo">260</span>        while (nDeviceId == null || !getOmemoStoreBackend().isAvailableDeviceId(omemoManager, nDeviceId)) {<a name="line.260"></a>
+<span class="sourceLineNo">261</span>            nDeviceId = OmemoManager.randomDeviceId();<a name="line.261"></a>
+<span class="sourceLineNo">262</span>        }<a name="line.262"></a>
+<span class="sourceLineNo">263</span><a name="line.263"></a>
+<span class="sourceLineNo">264</span>        getOmemoStoreBackend().forgetOmemoSessions(omemoManager);<a name="line.264"></a>
+<span class="sourceLineNo">265</span>        getOmemoStoreBackend().purgeOwnDeviceKeys(omemoManager);<a name="line.265"></a>
+<span class="sourceLineNo">266</span>        omemoManager.setDeviceId(nDeviceId);<a name="line.266"></a>
+<span class="sourceLineNo">267</span>        getOmemoStoreBackend().regenerate(omemoManager);<a name="line.267"></a>
+<span class="sourceLineNo">268</span>    }<a name="line.268"></a>
+<span class="sourceLineNo">269</span><a name="line.269"></a>
+<span class="sourceLineNo">270</span>    /**<a name="line.270"></a>
+<span class="sourceLineNo">271</span>     * Publish a fresh bundle to the server.<a name="line.271"></a>
+<span class="sourceLineNo">272</span>     *<a name="line.272"></a>
+<span class="sourceLineNo">273</span>     * @param omemoManager OmemoManager<a name="line.273"></a>
+<span class="sourceLineNo">274</span>     * @throws SmackException.NotConnectedException<a name="line.274"></a>
+<span class="sourceLineNo">275</span>     * @throws InterruptedException<a name="line.275"></a>
+<span class="sourceLineNo">276</span>     * @throws SmackException.NoResponseException<a name="line.276"></a>
+<span class="sourceLineNo">277</span>     * @throws CorruptedOmemoKeyException<a name="line.277"></a>
+<span class="sourceLineNo">278</span>     * @throws XMPPException.XMPPErrorException<a name="line.278"></a>
+<span class="sourceLineNo">279</span>     */<a name="line.279"></a>
+<span class="sourceLineNo">280</span>    void publishBundle(OmemoManager omemoManager)<a name="line.280"></a>
+<span class="sourceLineNo">281</span>            throws SmackException.NotConnectedException, InterruptedException,<a name="line.281"></a>
+<span class="sourceLineNo">282</span>            SmackException.NoResponseException, CorruptedOmemoKeyException, XMPPException.XMPPErrorException {<a name="line.282"></a>
+<span class="sourceLineNo">283</span>        Date lastSignedPreKeyRenewal = getOmemoStoreBackend().getDateOfLastSignedPreKeyRenewal(omemoManager);<a name="line.283"></a>
+<span class="sourceLineNo">284</span>        if (OmemoConfiguration.getRenewOldSignedPreKeys() &amp;&amp; lastSignedPreKeyRenewal != null) {<a name="line.284"></a>
+<span class="sourceLineNo">285</span>            if (System.currentTimeMillis() - lastSignedPreKeyRenewal.getTime()<a name="line.285"></a>
+<span class="sourceLineNo">286</span>                    &gt; 1000L * 60 * 60 * OmemoConfiguration.getRenewOldSignedPreKeysAfterHours()) {<a name="line.286"></a>
+<span class="sourceLineNo">287</span>                LOGGER.log(Level.INFO, "Renewing signedPreKey");<a name="line.287"></a>
+<span class="sourceLineNo">288</span>                getOmemoStoreBackend().changeSignedPreKey(omemoManager);<a name="line.288"></a>
+<span class="sourceLineNo">289</span>            }<a name="line.289"></a>
+<span class="sourceLineNo">290</span>        } else {<a name="line.290"></a>
+<span class="sourceLineNo">291</span>            getOmemoStoreBackend().setDateOfLastSignedPreKeyRenewal(omemoManager);<a name="line.291"></a>
+<span class="sourceLineNo">292</span>        }<a name="line.292"></a>
+<span class="sourceLineNo">293</span><a name="line.293"></a>
+<span class="sourceLineNo">294</span>        // publish<a name="line.294"></a>
+<span class="sourceLineNo">295</span>        PubSubManager.getInstance(omemoManager.getConnection(), omemoManager.getOwnJid())<a name="line.295"></a>
+<span class="sourceLineNo">296</span>                .tryToPublishAndPossibleAutoCreate(OmemoConstants.PEP_NODE_BUNDLE_FROM_DEVICE_ID(omemoManager.getDeviceId()),<a name="line.296"></a>
+<span class="sourceLineNo">297</span>                        new PayloadItem&lt;&gt;(getOmemoStoreBackend().packOmemoBundle(omemoManager)));<a name="line.297"></a>
+<span class="sourceLineNo">298</span>    }<a name="line.298"></a>
+<span class="sourceLineNo">299</span><a name="line.299"></a>
+<span class="sourceLineNo">300</span>    /**<a name="line.300"></a>
+<span class="sourceLineNo">301</span>     * Publish our deviceId in case it is not on the list already.<a name="line.301"></a>
+<span class="sourceLineNo">302</span>     * This method calls publishDeviceIdIfNeeded(omemoManager, deleteOtherDevices, false).<a name="line.302"></a>
+<span class="sourceLineNo">303</span>     * @param omemoManager          OmemoManager<a name="line.303"></a>
+<span class="sourceLineNo">304</span>     * @param deleteOtherDevices    Do we want to remove other devices from the list?<a name="line.304"></a>
+<span class="sourceLineNo">305</span>     * @throws InterruptedException<a name="line.305"></a>
+<span class="sourceLineNo">306</span>     * @throws PubSubException.NotALeafNodeException<a name="line.306"></a>
+<span class="sourceLineNo">307</span>     * @throws XMPPException.XMPPErrorException<a name="line.307"></a>
+<span class="sourceLineNo">308</span>     * @throws SmackException.NotConnectedException<a name="line.308"></a>
+<span class="sourceLineNo">309</span>     * @throws SmackException.NoResponseException<a name="line.309"></a>
+<span class="sourceLineNo">310</span>     */<a name="line.310"></a>
+<span class="sourceLineNo">311</span>    void publishDeviceIdIfNeeded(OmemoManager omemoManager, boolean deleteOtherDevices) throws InterruptedException,<a name="line.311"></a>
+<span class="sourceLineNo">312</span>            PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException,<a name="line.312"></a>
+<span class="sourceLineNo">313</span>            SmackException.NotConnectedException, SmackException.NoResponseException {<a name="line.313"></a>
+<span class="sourceLineNo">314</span>        publishDeviceIdIfNeeded(omemoManager, deleteOtherDevices, false);<a name="line.314"></a>
+<span class="sourceLineNo">315</span>    }<a name="line.315"></a>
+<span class="sourceLineNo">316</span><a name="line.316"></a>
+<span class="sourceLineNo">317</span>    /**<a name="line.317"></a>
+<span class="sourceLineNo">318</span>     * Publish our deviceId in case it is not on the list already.<a name="line.318"></a>
+<span class="sourceLineNo">319</span>     *<a name="line.319"></a>
+<span class="sourceLineNo">320</span>     * @param omemoManager       OmemoManager<a name="line.320"></a>
+<span class="sourceLineNo">321</span>     * @param deleteOtherDevices Do we want to remove other devices from the list?<a name="line.321"></a>
+<span class="sourceLineNo">322</span>     *                           If we do, publish the list with only our id, regardless if we were on the list<a name="line.322"></a>
+<span class="sourceLineNo">323</span>     *                           already.<a name="line.323"></a>
+<span class="sourceLineNo">324</span>     * @param publish            Do we want to force publishing our id?<a name="line.324"></a>
+<span class="sourceLineNo">325</span>     * @throws SmackException.NotConnectedException<a name="line.325"></a>
+<span class="sourceLineNo">326</span>     * @throws InterruptedException<a name="line.326"></a>
+<span class="sourceLineNo">327</span>     * @throws SmackException.NoResponseException<a name="line.327"></a>
+<span class="sourceLineNo">328</span>     * @throws XMPPException.XMPPErrorException<a name="line.328"></a>
+<span class="sourceLineNo">329</span>     * @throws PubSubException.NotALeafNodeException<a name="line.329"></a>
+<span class="sourceLineNo">330</span>     */<a name="line.330"></a>
+<span class="sourceLineNo">331</span>    void publishDeviceIdIfNeeded(OmemoManager omemoManager, boolean deleteOtherDevices, boolean publish)<a name="line.331"></a>
+<span class="sourceLineNo">332</span>            throws SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException,<a name="line.332"></a>
+<span class="sourceLineNo">333</span>            XMPPException.XMPPErrorException, PubSubException.NotALeafNodeException {<a name="line.333"></a>
+<span class="sourceLineNo">334</span><a name="line.334"></a>
+<span class="sourceLineNo">335</span>        CachedDeviceList deviceList = getOmemoStoreBackend().loadCachedDeviceList(omemoManager, omemoManager.getOwnJid());<a name="line.335"></a>
+<span class="sourceLineNo">336</span><a name="line.336"></a>
+<span class="sourceLineNo">337</span>        Set&lt;Integer&gt; deviceListIds;<a name="line.337"></a>
+<span class="sourceLineNo">338</span>        if (deviceList == null) {<a name="line.338"></a>
+<span class="sourceLineNo">339</span>            deviceListIds = new HashSet&lt;&gt;();<a name="line.339"></a>
+<span class="sourceLineNo">340</span>        } else {<a name="line.340"></a>
+<span class="sourceLineNo">341</span>            deviceListIds = new HashSet&lt;&gt;(deviceList.getActiveDevices());<a name="line.341"></a>
+<span class="sourceLineNo">342</span>        }<a name="line.342"></a>
+<span class="sourceLineNo">343</span><a name="line.343"></a>
+<span class="sourceLineNo">344</span>        if (deleteOtherDevices) {<a name="line.344"></a>
+<span class="sourceLineNo">345</span>            deviceListIds.clear();<a name="line.345"></a>
+<span class="sourceLineNo">346</span>        }<a name="line.346"></a>
+<span class="sourceLineNo">347</span><a name="line.347"></a>
+<span class="sourceLineNo">348</span>        int ourDeviceId = omemoManager.getDeviceId();<a name="line.348"></a>
+<span class="sourceLineNo">349</span>        if (deviceListIds.add(ourDeviceId)) {<a name="line.349"></a>
+<span class="sourceLineNo">350</span>            publish = true;<a name="line.350"></a>
+<span class="sourceLineNo">351</span>        }<a name="line.351"></a>
+<span class="sourceLineNo">352</span><a name="line.352"></a>
+<span class="sourceLineNo">353</span>        publish |= removeStaleDevicesIfNeeded(omemoManager, deviceListIds);<a name="line.353"></a>
+<span class="sourceLineNo">354</span><a name="line.354"></a>
+<span class="sourceLineNo">355</span>        if (publish) {<a name="line.355"></a>
+<span class="sourceLineNo">356</span>            publishDeviceIds(omemoManager, new OmemoDeviceListVAxolotlElement(deviceListIds));<a name="line.356"></a>
+<span class="sourceLineNo">357</span>        }<a name="line.357"></a>
+<span class="sourceLineNo">358</span>    }<a name="line.358"></a>
+<span class="sourceLineNo">359</span><a name="line.359"></a>
+<span class="sourceLineNo">360</span>    /**<a name="line.360"></a>
+<span class="sourceLineNo">361</span>     * Remove stale devices from our device list.<a name="line.361"></a>
+<span class="sourceLineNo">362</span>     * This does only delete devices, if that's configured in OmemoConfiguration.<a name="line.362"></a>
+<span class="sourceLineNo">363</span>     *<a name="line.363"></a>
+<span class="sourceLineNo">364</span>     * @param omemoManager  OmemoManager<a name="line.364"></a>
+<span class="sourceLineNo">365</span>     * @param deviceListIds deviceIds we plan to publish. Stale devices are deleted from that list.<a name="line.365"></a>
+<span class="sourceLineNo">366</span>     * @return<a name="line.366"></a>
+<span class="sourceLineNo">367</span>     */<a name="line.367"></a>
+<span class="sourceLineNo">368</span>    boolean removeStaleDevicesIfNeeded(OmemoManager omemoManager, Set&lt;Integer&gt; deviceListIds) {<a name="line.368"></a>
+<span class="sourceLineNo">369</span>        boolean publish = false;<a name="line.369"></a>
+<span class="sourceLineNo">370</span>        int ownDeviceId = omemoManager.getDeviceId();<a name="line.370"></a>
+<span class="sourceLineNo">371</span>        // Clear devices that we didn't receive a message from for a while<a name="line.371"></a>
+<span class="sourceLineNo">372</span>        Iterator&lt;Integer&gt; it = deviceListIds.iterator();<a name="line.372"></a>
+<span class="sourceLineNo">373</span>        while (OmemoConfiguration.getDeleteStaleDevices() &amp;&amp; it.hasNext()) {<a name="line.373"></a>
+<span class="sourceLineNo">374</span>            int id = it.next();<a name="line.374"></a>
+<span class="sourceLineNo">375</span>            if (id == ownDeviceId) {<a name="line.375"></a>
+<span class="sourceLineNo">376</span>                // Skip own id<a name="line.376"></a>
+<span class="sourceLineNo">377</span>                continue;<a name="line.377"></a>
+<span class="sourceLineNo">378</span>            }<a name="line.378"></a>
+<span class="sourceLineNo">379</span><a name="line.379"></a>
+<span class="sourceLineNo">380</span>            OmemoDevice d = new OmemoDevice(omemoManager.getOwnJid(), id);<a name="line.380"></a>
+<span class="sourceLineNo">381</span>            Date date = getOmemoStoreBackend().getDateOfLastReceivedMessage(omemoManager, d);<a name="line.381"></a>
+<span class="sourceLineNo">382</span><a name="line.382"></a>
+<span class="sourceLineNo">383</span>            if (date == null) {<a name="line.383"></a>
+<span class="sourceLineNo">384</span>                getOmemoStoreBackend().setDateOfLastReceivedMessage(omemoManager, d);<a name="line.384"></a>
+<span class="sourceLineNo">385</span>            } else {<a name="line.385"></a>
+<span class="sourceLineNo">386</span>                if (System.currentTimeMillis() - date.getTime() &gt; 1000L * 60 * 60 * OmemoConfiguration.getDeleteStaleDevicesAfterHours()) {<a name="line.386"></a>
+<span class="sourceLineNo">387</span>                    LOGGER.log(Level.INFO, "Remove device " + id + " because of more than " +<a name="line.387"></a>
+<span class="sourceLineNo">388</span>                            OmemoConfiguration.getDeleteStaleDevicesAfterHours() + " hours of inactivity.");<a name="line.388"></a>
+<span class="sourceLineNo">389</span>                    it.remove();<a name="line.389"></a>
+<span class="sourceLineNo">390</span>                    publish = true;<a name="line.390"></a>
+<span class="sourceLineNo">391</span>                }<a name="line.391"></a>
+<span class="sourceLineNo">392</span>            }<a name="line.392"></a>
+<span class="sourceLineNo">393</span>        }<a name="line.393"></a>
+<span class="sourceLineNo">394</span>        return publish;<a name="line.394"></a>
+<span class="sourceLineNo">395</span>    }<a name="line.395"></a>
+<span class="sourceLineNo">396</span><a name="line.396"></a>
+<span class="sourceLineNo">397</span>    /**<a name="line.397"></a>
+<span class="sourceLineNo">398</span>     * Publish the given deviceList to the server.<a name="line.398"></a>
+<span class="sourceLineNo">399</span>     *<a name="line.399"></a>
+<span class="sourceLineNo">400</span>     * @param omemoManager OmemoManager<a name="line.400"></a>
+<span class="sourceLineNo">401</span>     * @param deviceList list of deviceIDs<a name="line.401"></a>
+<span class="sourceLineNo">402</span>     * @throws InterruptedException                 Exception<a name="line.402"></a>
+<span class="sourceLineNo">403</span>     * @throws XMPPException.XMPPErrorException     Exception<a name="line.403"></a>
+<span class="sourceLineNo">404</span>     * @throws SmackException.NotConnectedException Exception<a name="line.404"></a>
+<span class="sourceLineNo">405</span>     * @throws SmackException.NoResponseException   Exception<a name="line.405"></a>
+<span class="sourceLineNo">406</span>     * @throws PubSubException.NotALeafNodeException Exception<a name="line.406"></a>
+<span class="sourceLineNo">407</span>     */<a name="line.407"></a>
+<span class="sourceLineNo">408</span>    static void publishDeviceIds(OmemoManager omemoManager, OmemoDeviceListElement deviceList)<a name="line.408"></a>
+<span class="sourceLineNo">409</span>            throws InterruptedException, XMPPException.XMPPErrorException,<a name="line.409"></a>
+<span class="sourceLineNo">410</span>            SmackException.NotConnectedException, SmackException.NoResponseException, PubSubException.NotALeafNodeException {<a name="line.410"></a>
+<span class="sourceLineNo">411</span>        PubSubManager.getInstance(omemoManager.getConnection(), omemoManager.getOwnJid())<a name="line.411"></a>
+<span class="sourceLineNo">412</span>                .tryToPublishAndPossibleAutoCreate(OmemoConstants.PEP_NODE_DEVICE_LIST, new PayloadItem&lt;&gt;(deviceList));<a name="line.412"></a>
+<span class="sourceLineNo">413</span>    }<a name="line.413"></a>
+<span class="sourceLineNo">414</span><a name="line.414"></a>
+<span class="sourceLineNo">415</span>    /**<a name="line.415"></a>
+<span class="sourceLineNo">416</span>     * Fetch the deviceList node of a contact.<a name="line.416"></a>
+<span class="sourceLineNo">417</span>     *<a name="line.417"></a>
+<span class="sourceLineNo">418</span>     * @param omemoManager omemoManager<a name="line.418"></a>
+<span class="sourceLineNo">419</span>     * @param contact contact<a name="line.419"></a>
+<span class="sourceLineNo">420</span>     * @return LeafNode<a name="line.420"></a>
+<span class="sourceLineNo">421</span>     * @throws InterruptedException<a name="line.421"></a>
+<span class="sourceLineNo">422</span>     * @throws PubSubException.NotALeafNodeException<a name="line.422"></a>
+<span class="sourceLineNo">423</span>     * @throws XMPPException.XMPPErrorException<a name="line.423"></a>
+<span class="sourceLineNo">424</span>     * @throws SmackException.NotConnectedException<a name="line.424"></a>
+<span class="sourceLineNo">425</span>     * @throws SmackException.NoResponseException<a name="line.425"></a>
+<span class="sourceLineNo">426</span>     * @throws NotAPubSubNodeException<a name="line.426"></a>
+<span class="sourceLineNo">427</span>     */<a name="line.427"></a>
+<span class="sourceLineNo">428</span>    static LeafNode fetchDeviceListNode(OmemoManager omemoManager, BareJid contact)<a name="line.428"></a>
+<span class="sourceLineNo">429</span>            throws InterruptedException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException,<a name="line.429"></a>
+<span class="sourceLineNo">430</span>            SmackException.NotConnectedException, SmackException.NoResponseException, NotAPubSubNodeException {<a name="line.430"></a>
+<span class="sourceLineNo">431</span>        return PubSubManager.getInstance(omemoManager.getConnection(), contact).getLeafNode(PEP_NODE_DEVICE_LIST);<a name="line.431"></a>
+<span class="sourceLineNo">432</span>    }<a name="line.432"></a>
+<span class="sourceLineNo">433</span><a name="line.433"></a>
+<span class="sourceLineNo">434</span>    /**<a name="line.434"></a>
+<span class="sourceLineNo">435</span>     * Directly fetch the device list of a contact.<a name="line.435"></a>
+<span class="sourceLineNo">436</span>     *<a name="line.436"></a>
+<span class="sourceLineNo">437</span>     * @param omemoManager OmemoManager<a name="line.437"></a>
+<span class="sourceLineNo">438</span>     * @param contact BareJid of the contact<a name="line.438"></a>
+<span class="sourceLineNo">439</span>     * @return The OmemoDeviceListElement of the contact<a name="line.439"></a>
+<span class="sourceLineNo">440</span>     * @throws XMPPException.XMPPErrorException     When<a name="line.440"></a>
+<span class="sourceLineNo">441</span>     * @throws SmackException.NotConnectedException something<a name="line.441"></a>
+<span class="sourceLineNo">442</span>     * @throws InterruptedException                 goes<a name="line.442"></a>
+<span class="sourceLineNo">443</span>     * @throws SmackException.NoResponseException   wrong<a name="line.443"></a>
+<span class="sourceLineNo">444</span>     * @throws PubSubException.NotALeafNodeException when the device lists node is not a LeafNode<a name="line.444"></a>
+<span class="sourceLineNo">445</span>     * @throws NotAPubSubNodeException<a name="line.445"></a>
+<span class="sourceLineNo">446</span>     */<a name="line.446"></a>
+<span class="sourceLineNo">447</span>    static OmemoDeviceListElement fetchDeviceList(OmemoManager omemoManager, BareJid contact)<a name="line.447"></a>
+<span class="sourceLineNo">448</span>                    throws XMPPException.XMPPErrorException, SmackException.NotConnectedException, InterruptedException,<a name="line.448"></a>
+<span class="sourceLineNo">449</span>                    SmackException.NoResponseException, PubSubException.NotALeafNodeException, NotAPubSubNodeException {<a name="line.449"></a>
+<span class="sourceLineNo">450</span>        return extractDeviceListFrom(fetchDeviceListNode(omemoManager, contact));<a name="line.450"></a>
+<span class="sourceLineNo">451</span>    }<a name="line.451"></a>
+<span class="sourceLineNo">452</span><a name="line.452"></a>
+<span class="sourceLineNo">453</span>    /**<a name="line.453"></a>
+<span class="sourceLineNo">454</span>     * Refresh our deviceList from the server.<a name="line.454"></a>
+<span class="sourceLineNo">455</span>     *<a name="line.455"></a>
+<span class="sourceLineNo">456</span>     * @param omemoManager omemoManager<a name="line.456"></a>
+<span class="sourceLineNo">457</span>     * @return true, if we should publish our device list again (because its broken or not existent...)<a name="line.457"></a>
+<span class="sourceLineNo">458</span>     *<a name="line.458"></a>
+<span class="sourceLineNo">459</span>     * @throws SmackException.NotConnectedException<a name="line.459"></a>
+<span class="sourceLineNo">460</span>     * @throws InterruptedException<a name="line.460"></a>
+<span class="sourceLineNo">461</span>     * @throws SmackException.NoResponseException<a name="line.461"></a>
+<span class="sourceLineNo">462</span>     */<a name="line.462"></a>
+<span class="sourceLineNo">463</span>    private boolean refreshOwnDeviceList(OmemoManager omemoManager) throws SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException, XMPPException.XMPPErrorException {<a name="line.463"></a>
+<span class="sourceLineNo">464</span>        try {<a name="line.464"></a>
+<span class="sourceLineNo">465</span>            getOmemoStoreBackend().mergeCachedDeviceList(omemoManager, omemoManager.getOwnJid(),<a name="line.465"></a>
+<span class="sourceLineNo">466</span>                    fetchDeviceList(omemoManager, omemoManager.getOwnJid()));<a name="line.466"></a>
+<span class="sourceLineNo">467</span><a name="line.467"></a>
+<span class="sourceLineNo">468</span>        } catch (XMPPException.XMPPErrorException e) {<a name="line.468"></a>
+<span class="sourceLineNo">469</span><a name="line.469"></a>
+<span class="sourceLineNo">470</span>            if (e.getStanzaError().getCondition() == StanzaError.Condition.item_not_found) {<a name="line.470"></a>
+<span class="sourceLineNo">471</span>                LOGGER.log(Level.WARNING, "Could not refresh own deviceList, because the node did not exist: "<a name="line.471"></a>
+<span class="sourceLineNo">472</span>                        + e.getMessage());<a name="line.472"></a>
+<span class="sourceLineNo">473</span>                return true;<a name="line.473"></a>
+<span class="sourceLineNo">474</span>            }<a name="line.474"></a>
+<span class="sourceLineNo">475</span><a name="line.475"></a>
+<span class="sourceLineNo">476</span>            throw e;<a name="line.476"></a>
+<span class="sourceLineNo">477</span><a name="line.477"></a>
+<span class="sourceLineNo">478</span>        } catch (PubSubException.NotALeafNodeException e) {<a name="line.478"></a>
+<span class="sourceLineNo">479</span>            LOGGER.log(Level.WARNING, "Could not refresh own deviceList, because the Node is not a LeafNode: " +<a name="line.479"></a>
+<span class="sourceLineNo">480</span>                    e.getMessage());<a name="line.480"></a>
+<span class="sourceLineNo">481</span>        }<a name="line.481"></a>
+<span class="sourceLineNo">482</span><a name="line.482"></a>
+<span class="sourceLineNo">483</span>        catch (PubSubException.NotAPubSubNodeException e) {<a name="line.483"></a>
+<span class="sourceLineNo">484</span>            LOGGER.log(Level.WARNING, "Caught a PubSubAssertionError when fetching a deviceList node. " +<a name="line.484"></a>
+<span class="sourceLineNo">485</span>                    "This probably means that we're dealing with an ejabberd server and the LeafNode does not exist.", e);<a name="line.485"></a>
+<span class="sourceLineNo">486</span>            return true;<a name="line.486"></a>
+<span class="sourceLineNo">487</span>        }<a name="line.487"></a>
+<span class="sourceLineNo">488</span>        return false;<a name="line.488"></a>
+<span class="sourceLineNo">489</span>    }<a name="line.489"></a>
+<span class="sourceLineNo">490</span><a name="line.490"></a>
+<span class="sourceLineNo">491</span>    /**<a name="line.491"></a>
+<span class="sourceLineNo">492</span>     * Refresh the deviceList of contact and merge it with the one stored locally.<a name="line.492"></a>
+<span class="sourceLineNo">493</span>     * @param omemoManager omemoManager<a name="line.493"></a>
+<span class="sourceLineNo">494</span>     * @param contact contact<a name="line.494"></a>
+<span class="sourceLineNo">495</span>     * @throws SmackException.NotConnectedException<a name="line.495"></a>
+<span class="sourceLineNo">496</span>     * @throws InterruptedException<a name="line.496"></a>
+<span class="sourceLineNo">497</span>     * @throws SmackException.NoResponseException<a name="line.497"></a>
+<span class="sourceLineNo">498</span>     */<a name="line.498"></a>
+<span class="sourceLineNo">499</span>    void refreshDeviceList(OmemoManager omemoManager, BareJid contact) throws SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException {<a name="line.499"></a>
+<span class="sourceLineNo">500</span>        OmemoDeviceListElement omemoDeviceListElement;<a name="line.500"></a>
+<span class="sourceLineNo">501</span>        try {<a name="line.501"></a>
+<span class="sourceLineNo">502</span>            omemoDeviceListElement = fetchDeviceList(omemoManager, contact);<a name="line.502"></a>
+<span class="sourceLineNo">503</span>        } catch (PubSubException.NotALeafNodeException | XMPPException.XMPPErrorException e) {<a name="line.503"></a>
+<span class="sourceLineNo">504</span>            LOGGER.log(Level.WARNING, "Could not fetch device list of " + contact + ": " + e, e);<a name="line.504"></a>
+<span class="sourceLineNo">505</span>            return;<a name="line.505"></a>
+<span class="sourceLineNo">506</span>        }<a name="line.506"></a>
+<span class="sourceLineNo">507</span>        catch (NotAPubSubNodeException e) {<a name="line.507"></a>
+<span class="sourceLineNo">508</span>            LOGGER.log(Level.WARNING, "Could not fetch device list of " + contact ,e);<a name="line.508"></a>
+<span class="sourceLineNo">509</span>            return;<a name="line.509"></a>
+<span class="sourceLineNo">510</span>        }<a name="line.510"></a>
+<span class="sourceLineNo">511</span><a name="line.511"></a>
+<span class="sourceLineNo">512</span>        getOmemoStoreBackend().mergeCachedDeviceList(omemoManager, contact, omemoDeviceListElement);<a name="line.512"></a>
+<span class="sourceLineNo">513</span>    }<a name="line.513"></a>
+<span class="sourceLineNo">514</span><a name="line.514"></a>
+<span class="sourceLineNo">515</span>    /**<a name="line.515"></a>
+<span class="sourceLineNo">516</span>     * Fetch the OmemoBundleElement of the contact.<a name="line.516"></a>
+<span class="sourceLineNo">517</span>     *<a name="line.517"></a>
+<span class="sourceLineNo">518</span>     * @param omemoManager OmemoManager<a name="line.518"></a>
+<span class="sourceLineNo">519</span>     * @param contact the contacts BareJid<a name="line.519"></a>
+<span class="sourceLineNo">520</span>     * @return the OmemoBundleElement of the contact<a name="line.520"></a>
+<span class="sourceLineNo">521</span>     * @throws XMPPException.XMPPErrorException     When<a name="line.521"></a>
+<span class="sourceLineNo">522</span>     * @throws SmackException.NotConnectedException something<a name="line.522"></a>
+<span class="sourceLineNo">523</span>     * @throws InterruptedException                 goes<a name="line.523"></a>
+<span class="sourceLineNo">524</span>     * @throws SmackException.NoResponseException   wrong<a name="line.524"></a>
+<span class="sourceLineNo">525</span>     * @throws PubSubException.NotALeafNodeException when the bundles node is not a LeafNode<a name="line.525"></a>
+<span class="sourceLineNo">526</span>     * @throws NotAPubSubNodeException<a name="line.526"></a>
+<span class="sourceLineNo">527</span>     */<a name="line.527"></a>
+<span class="sourceLineNo">528</span>    static OmemoBundleVAxolotlElement fetchBundle(OmemoManager omemoManager, OmemoDevice contact)<a name="line.528"></a>
+<span class="sourceLineNo">529</span>                    throws XMPPException.XMPPErrorException, SmackException.NotConnectedException, InterruptedException,<a name="line.529"></a>
+<span class="sourceLineNo">530</span>                    SmackException.NoResponseException, PubSubException.NotALeafNodeException, NotAPubSubNodeException {<a name="line.530"></a>
+<span class="sourceLineNo">531</span>        LeafNode node = PubSubManager.getInstance(omemoManager.getConnection(), contact.getJid()).getLeafNode(<a name="line.531"></a>
+<span class="sourceLineNo">532</span>                        PEP_NODE_BUNDLE_FROM_DEVICE_ID(contact.getDeviceId()));<a name="line.532"></a>
+<span class="sourceLineNo">533</span>        return extractBundleFrom(node);<a name="line.533"></a>
+<span class="sourceLineNo">534</span>    }<a name="line.534"></a>
+<span class="sourceLineNo">535</span><a name="line.535"></a>
+<span class="sourceLineNo">536</span>    /**<a name="line.536"></a>
+<span class="sourceLineNo">537</span>     * Extract the OmemoBundleElement of a contact from a LeafNode.<a name="line.537"></a>
+<span class="sourceLineNo">538</span>     *<a name="line.538"></a>
+<span class="sourceLineNo">539</span>     * @param node typically a LeafNode containing the OmemoBundles of a contact<a name="line.539"></a>
+<span class="sourceLineNo">540</span>     * @return the OmemoBundleElement<a name="line.540"></a>
+<span class="sourceLineNo">541</span>     * @throws XMPPException.XMPPErrorException     When<a name="line.541"></a>
+<span class="sourceLineNo">542</span>     * @throws SmackException.NotConnectedException something<a name="line.542"></a>
+<span class="sourceLineNo">543</span>     * @throws InterruptedException                 goes<a name="line.543"></a>
+<span class="sourceLineNo">544</span>     * @throws SmackException.NoResponseException   wrong<a name="line.544"></a>
+<span class="sourceLineNo">545</span>     */<a name="line.545"></a>
+<span class="sourceLineNo">546</span>    private static OmemoBundleVAxolotlElement extractBundleFrom(LeafNode node) throws XMPPException.XMPPErrorException, SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException {<a name="line.546"></a>
+<span class="sourceLineNo">547</span>        if (node == null) {<a name="line.547"></a>
+<span class="sourceLineNo">548</span>            return null;<a name="line.548"></a>
+<span class="sourceLineNo">549</span>        }<a name="line.549"></a>
+<span class="sourceLineNo">550</span>        try {<a name="line.550"></a>
+<span class="sourceLineNo">551</span>            return (OmemoBundleVAxolotlElement) ((PayloadItem&lt;?&gt;) node.getItems().get(0)).getPayload();<a name="line.551"></a>
+<span class="sourceLineNo">552</span>        } catch (IndexOutOfBoundsException e) {<a name="line.552"></a>
+<span class="sourceLineNo">553</span>            return null;<a name="line.553"></a>
+<span class="sourceLineNo">554</span>        }<a name="line.554"></a>
+<span class="sourceLineNo">555</span>    }<a name="line.555"></a>
+<span class="sourceLineNo">556</span><a name="line.556"></a>
+<span class="sourceLineNo">557</span>    /**<a name="line.557"></a>
+<span class="sourceLineNo">558</span>     * Extract the OmemoDeviceListElement of a contact from a node containing his OmemoDeviceListElement.<a name="line.558"></a>
+<span class="sourceLineNo">559</span>     *<a name="line.559"></a>
+<span class="sourceLineNo">560</span>     * @param node typically a LeafNode containing the OmemoDeviceListElement of a contact<a name="line.560"></a>
+<span class="sourceLineNo">561</span>     * @return the extracted OmemoDeviceListElement.<a name="line.561"></a>
+<span class="sourceLineNo">562</span>     * @throws XMPPException.XMPPErrorException     When<a name="line.562"></a>
+<span class="sourceLineNo">563</span>     * @throws SmackException.NotConnectedException something<a name="line.563"></a>
+<span class="sourceLineNo">564</span>     * @throws InterruptedException                 goes<a name="line.564"></a>
+<span class="sourceLineNo">565</span>     * @throws SmackException.NoResponseException   wrong<a name="line.565"></a>
+<span class="sourceLineNo">566</span>     */<a name="line.566"></a>
+<span class="sourceLineNo">567</span>    private static OmemoDeviceListElement extractDeviceListFrom(LeafNode node) throws XMPPException.XMPPErrorException, SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException {<a name="line.567"></a>
+<span class="sourceLineNo">568</span>        if (node == null) {<a name="line.568"></a>
+<span class="sourceLineNo">569</span>            LOGGER.log(Level.WARNING, "DeviceListNode is null.");<a name="line.569"></a>
+<span class="sourceLineNo">570</span>            return null;<a name="line.570"></a>
+<span class="sourceLineNo">571</span>        }<a name="line.571"></a>
+<span class="sourceLineNo">572</span>        List&lt;?&gt; items = node.getItems();<a name="line.572"></a>
+<span class="sourceLineNo">573</span>        if (items.size() &gt; 0) {<a name="line.573"></a>
+<span class="sourceLineNo">574</span>            OmemoDeviceListVAxolotlElement listElement = (OmemoDeviceListVAxolotlElement) ((PayloadItem&lt;?&gt;) items.get(items.size() - 1)).getPayload();<a name="line.574"></a>
+<span class="sourceLineNo">575</span>            if (items.size() &gt; 1) {<a name="line.575"></a>
+<span class="sourceLineNo">576</span>                node.deleteAllItems();<a name="line.576"></a>
+<span class="sourceLineNo">577</span>                node.publish(new PayloadItem&lt;&gt;(listElement));<a name="line.577"></a>
+<span class="sourceLineNo">578</span>            }<a name="line.578"></a>
+<span class="sourceLineNo">579</span>            return listElement;<a name="line.579"></a>
+<span class="sourceLineNo">580</span>        }<a name="line.580"></a>
+<span class="sourceLineNo">581</span><a name="line.581"></a>
+<span class="sourceLineNo">582</span>        Set&lt;Integer&gt; emptySet = Collections.emptySet();<a name="line.582"></a>
+<span class="sourceLineNo">583</span>        return new OmemoDeviceListVAxolotlElement(emptySet);<a name="line.583"></a>
+<span class="sourceLineNo">584</span>    }<a name="line.584"></a>
+<span class="sourceLineNo">585</span><a name="line.585"></a>
+<span class="sourceLineNo">586</span>    /**<a name="line.586"></a>
+<span class="sourceLineNo">587</span>     * Build sessions for all devices of the contact that we do not have a session with yet.<a name="line.587"></a>
+<span class="sourceLineNo">588</span>     *<a name="line.588"></a>
+<span class="sourceLineNo">589</span>     * @param omemoManager omemoManager<a name="line.589"></a>
+<span class="sourceLineNo">590</span>     * @param jid the BareJid of the contact<a name="line.590"></a>
+<span class="sourceLineNo">591</span>     */<a name="line.591"></a>
+<span class="sourceLineNo">592</span>    void buildOrCreateOmemoSessionsFromBundles(OmemoManager omemoManager, BareJid jid) throws SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException, CannotEstablishOmemoSessionException {<a name="line.592"></a>
+<span class="sourceLineNo">593</span>        CachedDeviceList devices = getOmemoStoreBackend().loadCachedDeviceList(omemoManager, jid);<a name="line.593"></a>
+<span class="sourceLineNo">594</span>        CannotEstablishOmemoSessionException sessionException = null;<a name="line.594"></a>
+<span class="sourceLineNo">595</span>        if (devices == null || devices.getAllDevices().isEmpty()) {<a name="line.595"></a>
+<span class="sourceLineNo">596</span>            refreshDeviceList(omemoManager, jid);<a name="line.596"></a>
+<span class="sourceLineNo">597</span>            devices = getOmemoStoreBackend().loadCachedDeviceList(omemoManager, jid);<a name="line.597"></a>
+<span class="sourceLineNo">598</span>        }<a name="line.598"></a>
+<span class="sourceLineNo">599</span><a name="line.599"></a>
+<span class="sourceLineNo">600</span>        for (int id : devices.getActiveDevices()) {<a name="line.600"></a>
+<span class="sourceLineNo">601</span>            OmemoDevice device = new OmemoDevice(jid, id);<a name="line.601"></a>
+<span class="sourceLineNo">602</span>            if (getOmemoStoreBackend().containsRawSession(omemoManager, device)) {<a name="line.602"></a>
+<span class="sourceLineNo">603</span>                // We have a session already.<a name="line.603"></a>
+<span class="sourceLineNo">604</span>                continue;<a name="line.604"></a>
+<span class="sourceLineNo">605</span>            }<a name="line.605"></a>
+<span class="sourceLineNo">606</span><a name="line.606"></a>
+<span class="sourceLineNo">607</span>            // Build missing session<a name="line.607"></a>
+<span class="sourceLineNo">608</span>            try {<a name="line.608"></a>
+<span class="sourceLineNo">609</span>                buildSessionFromOmemoBundle(omemoManager, device, false);<a name="line.609"></a>
+<span class="sourceLineNo">610</span>            } catch (CannotEstablishOmemoSessionException e) {<a name="line.610"></a>
+<span class="sourceLineNo">611</span><a name="line.611"></a>
+<span class="sourceLineNo">612</span>                if (sessionException == null) {<a name="line.612"></a>
+<span class="sourceLineNo">613</span>                    sessionException = e;<a name="line.613"></a>
+<span class="sourceLineNo">614</span>                } else {<a name="line.614"></a>
+<span class="sourceLineNo">615</span>                    sessionException.addFailures(e);<a name="line.615"></a>
+<span class="sourceLineNo">616</span>                }<a name="line.616"></a>
+<span class="sourceLineNo">617</span><a name="line.617"></a>
+<span class="sourceLineNo">618</span>            } catch (CorruptedOmemoKeyException e) {<a name="line.618"></a>
+<span class="sourceLineNo">619</span>                CannotEstablishOmemoSessionException fail =<a name="line.619"></a>
+<span class="sourceLineNo">620</span>                        new CannotEstablishOmemoSessionException(device, e);<a name="line.620"></a>
+<span class="sourceLineNo">621</span><a name="line.621"></a>
+<span class="sourceLineNo">622</span>                if (sessionException == null) {<a name="line.622"></a>
+<span class="sourceLineNo">623</span>                    sessionException = fail;<a name="line.623"></a>
+<span class="sourceLineNo">624</span>                } else {<a name="line.624"></a>
+<span class="sourceLineNo">625</span>                    sessionException.addFailures(fail);<a name="line.625"></a>
+<span class="sourceLineNo">626</span>                }<a name="line.626"></a>
+<span class="sourceLineNo">627</span>            }<a name="line.627"></a>
+<span class="sourceLineNo">628</span>        }<a name="line.628"></a>
+<span class="sourceLineNo">629</span><a name="line.629"></a>
+<span class="sourceLineNo">630</span>        if (sessionException != null) {<a name="line.630"></a>
+<span class="sourceLineNo">631</span>            throw sessionException;<a name="line.631"></a>
+<span class="sourceLineNo">632</span>        }<a name="line.632"></a>
+<span class="sourceLineNo">633</span>    }<a name="line.633"></a>
+<span class="sourceLineNo">634</span><a name="line.634"></a>
+<span class="sourceLineNo">635</span>    /**<a name="line.635"></a>
+<span class="sourceLineNo">636</span>     * Build an OmemoSession for the given OmemoDevice.<a name="line.636"></a>
+<span class="sourceLineNo">637</span>     *<a name="line.637"></a>
+<span class="sourceLineNo">638</span>     * @param omemoManager omemoManager<a name="line.638"></a>
+<span class="sourceLineNo">639</span>     * @param device OmemoDevice<a name="line.639"></a>
+<span class="sourceLineNo">640</span>     * @param fresh Do we want to build a session even if we already have one?<a name="line.640"></a>
+<span class="sourceLineNo">641</span>     * @throws CannotEstablishOmemoSessionException when no session could be established<a name="line.641"></a>
+<span class="sourceLineNo">642</span>     * @throws CorruptedOmemoKeyException when the bundle contained an invalid OMEMO identityKey<a name="line.642"></a>
+<span class="sourceLineNo">643</span>     */<a name="line.643"></a>
+<span class="sourceLineNo">644</span>    public void buildSessionFromOmemoBundle(OmemoManager omemoManager, OmemoDevice device, boolean fresh) throws CannotEstablishOmemoSessionException, CorruptedOmemoKeyException {<a name="line.644"></a>
+<span class="sourceLineNo">645</span><a name="line.645"></a>
+<span class="sourceLineNo">646</span>        if (device.equals(omemoManager.getOwnDevice())) {<a name="line.646"></a>
+<span class="sourceLineNo">647</span>            return;<a name="line.647"></a>
+<span class="sourceLineNo">648</span>        }<a name="line.648"></a>
+<span class="sourceLineNo">649</span><a name="line.649"></a>
+<span class="sourceLineNo">650</span>        // Do not build sessions with devices we already know...<a name="line.650"></a>
+<span class="sourceLineNo">651</span>        if (!fresh &amp;&amp; getOmemoStoreBackend().containsRawSession(omemoManager, device)) {<a name="line.651"></a>
+<span class="sourceLineNo">652</span>            getOmemoStoreBackend().getOmemoSessionOf(omemoManager, device); //Make sure its loaded though<a name="line.652"></a>
+<span class="sourceLineNo">653</span>            return;<a name="line.653"></a>
+<span class="sourceLineNo">654</span>        }<a name="line.654"></a>
+<span class="sourceLineNo">655</span><a name="line.655"></a>
+<span class="sourceLineNo">656</span>        OmemoBundleVAxolotlElement bundle;<a name="line.656"></a>
+<span class="sourceLineNo">657</span>        try {<a name="line.657"></a>
+<span class="sourceLineNo">658</span>            bundle = fetchBundle(omemoManager, device);<a name="line.658"></a>
+<span class="sourceLineNo">659</span>        } catch (SmackException | XMPPException.XMPPErrorException | InterruptedException e) {<a name="line.659"></a>
+<span class="sourceLineNo">660</span>            throw new CannotEstablishOmemoSessionException(device, e);<a name="line.660"></a>
+<span class="sourceLineNo">661</span>        }<a name="line.661"></a>
+<span class="sourceLineNo">662</span><a name="line.662"></a>
+<span class="sourceLineNo">663</span>        HashMap&lt;Integer, T_Bundle&gt; bundles = getOmemoStoreBackend().keyUtil().BUNDLE.bundles(bundle, device);<a name="line.663"></a>
+<span class="sourceLineNo">664</span><a name="line.664"></a>
+<span class="sourceLineNo">665</span>        // Select random Bundle<a name="line.665"></a>
+<span class="sourceLineNo">666</span>        int randomIndex = new Random().nextInt(bundles.size());<a name="line.666"></a>
+<span class="sourceLineNo">667</span>        T_Bundle randomPreKeyBundle = new ArrayList&lt;&gt;(bundles.values()).get(randomIndex);<a name="line.667"></a>
+<span class="sourceLineNo">668</span>        // Build raw session<a name="line.668"></a>
+<span class="sourceLineNo">669</span>        processBundle(omemoManager, randomPreKeyBundle, device);<a name="line.669"></a>
+<span class="sourceLineNo">670</span>    }<a name="line.670"></a>
+<span class="sourceLineNo">671</span><a name="line.671"></a>
+<span class="sourceLineNo">672</span>    /**<a name="line.672"></a>
+<span class="sourceLineNo">673</span>     * Process a received bundle. Typically that includes saving keys and building a session.<a name="line.673"></a>
+<span class="sourceLineNo">674</span>     *<a name="line.674"></a>
+<span class="sourceLineNo">675</span>     * @param omemoManager omemoManager that will process the bundle<a name="line.675"></a>
+<span class="sourceLineNo">676</span>     * @param bundle T_Bundle (depends on used Signal/Olm library)<a name="line.676"></a>
+<span class="sourceLineNo">677</span>     * @param device OmemoDevice<a name="line.677"></a>
+<span class="sourceLineNo">678</span>     * @throws CorruptedOmemoKeyException<a name="line.678"></a>
+<span class="sourceLineNo">679</span>     */<a name="line.679"></a>
+<span class="sourceLineNo">680</span>    protected abstract void processBundle(OmemoManager omemoManager, T_Bundle bundle, OmemoDevice device) throws CorruptedOmemoKeyException;<a name="line.680"></a>
+<span class="sourceLineNo">681</span><a name="line.681"></a>
+<span class="sourceLineNo">682</span>    /**<a name="line.682"></a>
+<span class="sourceLineNo">683</span>     * Process a received message. Try to decrypt it in case we are a recipient device. If we are not a recipient<a name="line.683"></a>
+<span class="sourceLineNo">684</span>     * device, return null.<a name="line.684"></a>
+<span class="sourceLineNo">685</span>     *<a name="line.685"></a>
+<span class="sourceLineNo">686</span>     * @param sender        the BareJid of the sender of the message<a name="line.686"></a>
+<span class="sourceLineNo">687</span>     * @param message       the encrypted message<a name="line.687"></a>
+<span class="sourceLineNo">688</span>     * @param information   OmemoMessageInformation object which will contain meta data about the decrypted message<a name="line.688"></a>
+<span class="sourceLineNo">689</span>     * @return decrypted message or null<a name="line.689"></a>
+<span class="sourceLineNo">690</span>     * @throws NoRawSessionException<a name="line.690"></a>
+<span class="sourceLineNo">691</span>     * @throws InterruptedException<a name="line.691"></a>
+<span class="sourceLineNo">692</span>     * @throws SmackException.NoResponseException<a name="line.692"></a>
+<span class="sourceLineNo">693</span>     * @throws SmackException.NotConnectedException<a name="line.693"></a>
+<span class="sourceLineNo">694</span>     * @throws CryptoFailedException<a name="line.694"></a>
+<span class="sourceLineNo">695</span>     * @throws XMPPException.XMPPErrorException<a name="line.695"></a>
+<span class="sourceLineNo">696</span>     * @throws CorruptedOmemoKeyException<a name="line.696"></a>
+<span class="sourceLineNo">697</span>     */<a name="line.697"></a>
+<span class="sourceLineNo">698</span>    private Message processReceivingMessage(OmemoManager omemoManager, OmemoDevice sender, OmemoElement message, final OmemoMessageInformation information)<a name="line.698"></a>
+<span class="sourceLineNo">699</span>            throws NoRawSessionException, InterruptedException, SmackException.NoResponseException, SmackException.NotConnectedException,<a name="line.699"></a>
+<span class="sourceLineNo">700</span>            CryptoFailedException, XMPPException.XMPPErrorException, CorruptedOmemoKeyException {<a name="line.700"></a>
+<span class="sourceLineNo">701</span><a name="line.701"></a>
+<span class="sourceLineNo">702</span>        ArrayList&lt;OmemoVAxolotlElement.OmemoHeader.Key&gt; messageRecipientKeys = message.getHeader().getKeys();<a name="line.702"></a>
+<span class="sourceLineNo">703</span>        // Do we have a key with our ID in the message?<a name="line.703"></a>
+<span class="sourceLineNo">704</span>        for (OmemoVAxolotlElement.OmemoHeader.Key k : messageRecipientKeys) {<a name="line.704"></a>
+<span class="sourceLineNo">705</span>            // Only decrypt with our deviceID<a name="line.705"></a>
+<span class="sourceLineNo">706</span>            if (k.getId() != omemoManager.getDeviceId()) {<a name="line.706"></a>
+<span class="sourceLineNo">707</span>                continue;<a name="line.707"></a>
+<span class="sourceLineNo">708</span>            }<a name="line.708"></a>
+<span class="sourceLineNo">709</span><a name="line.709"></a>
+<span class="sourceLineNo">710</span>            Message decrypted = decryptOmemoMessageElement(omemoManager, sender, message, information);<a name="line.710"></a>
+<span class="sourceLineNo">711</span>            if (sender.equals(omemoManager.getOwnJid()) &amp;&amp; decrypted != null) {<a name="line.711"></a>
+<span class="sourceLineNo">712</span>                getOmemoStoreBackend().setDateOfLastReceivedMessage(omemoManager, sender);<a name="line.712"></a>
+<span class="sourceLineNo">713</span>            }<a name="line.713"></a>
+<span class="sourceLineNo">714</span>            return decrypted;<a name="line.714"></a>
+<span class="sourceLineNo">715</span>        }<a name="line.715"></a>
+<span class="sourceLineNo">716</span><a name="line.716"></a>
+<span class="sourceLineNo">717</span>        LOGGER.log(Level.INFO, "There is no key with our deviceId. Silently discard the message.");<a name="line.717"></a>
+<span class="sourceLineNo">718</span>        return null;<a name="line.718"></a>
+<span class="sourceLineNo">719</span>    }<a name="line.719"></a>
+<span class="sourceLineNo">720</span><a name="line.720"></a>
+<span class="sourceLineNo">721</span>    /**<a name="line.721"></a>
+<span class="sourceLineNo">722</span>     * Decrypt a given OMEMO encrypted message. Return null, if there is no OMEMO element in the message,<a name="line.722"></a>
+<span class="sourceLineNo">723</span>     * otherwise try to decrypt the message and return a ClearTextMessage object.<a name="line.723"></a>
+<span class="sourceLineNo">724</span>     *<a name="line.724"></a>
+<span class="sourceLineNo">725</span>     * @param omemoManager omemoManager of the receiving device<a name="line.725"></a>
+<span class="sourceLineNo">726</span>     * @param sender barejid of the sender<a name="line.726"></a>
+<span class="sourceLineNo">727</span>     * @param message encrypted message<a name="line.727"></a>
+<span class="sourceLineNo">728</span>     * @return decrypted message or null<a name="line.728"></a>
+<span class="sourceLineNo">729</span>     * @throws InterruptedException                 Exception<a name="line.729"></a>
+<span class="sourceLineNo">730</span>     * @throws SmackException.NoResponseException   Exception<a name="line.730"></a>
+<span class="sourceLineNo">731</span>     * @throws SmackException.NotConnectedException Exception<a name="line.731"></a>
+<span class="sourceLineNo">732</span>     * @throws CryptoFailedException                When the message could not be decrypted.<a name="line.732"></a>
+<span class="sourceLineNo">733</span>     * @throws XMPPException.XMPPErrorException     Exception<a name="line.733"></a>
+<span class="sourceLineNo">734</span>     * @throws CorruptedOmemoKeyException           When the used OMEMO keys are invalid.<a name="line.734"></a>
+<span class="sourceLineNo">735</span>     * @throws NoRawSessionException                When there is no session to decrypt the message with in the double<a name="line.735"></a>
+<span class="sourceLineNo">736</span>     *                                              ratchet library<a name="line.736"></a>
+<span class="sourceLineNo">737</span>     */<a name="line.737"></a>
+<span class="sourceLineNo">738</span>    ClearTextMessage processLocalMessage(OmemoManager omemoManager, BareJid sender, Message message) throws InterruptedException, SmackException.NoResponseException, SmackException.NotConnectedException, CryptoFailedException, XMPPException.XMPPErrorException, CorruptedOmemoKeyException, NoRawSessionException {<a name="line.738"></a>
+<span class="sourceLineNo">739</span>        if (OmemoManager.stanzaContainsOmemoElement(message)) {<a name="line.739"></a>
+<span class="sourceLineNo">740</span>            OmemoElement omemoMessageElement = message.getExtension(OmemoElement.ENCRYPTED, OMEMO_NAMESPACE_V_AXOLOTL);<a name="line.740"></a>
+<span class="sourceLineNo">741</span>            OmemoMessageInformation info = new OmemoMessageInformation();<a name="line.741"></a>
+<span class="sourceLineNo">742</span>            Message decrypted = processReceivingMessage(omemoManager,<a name="line.742"></a>
+<span class="sourceLineNo">743</span>                    new OmemoDevice(sender, omemoMessageElement.getHeader().getSid()),<a name="line.743"></a>
+<span class="sourceLineNo">744</span>                    omemoMessageElement, info);<a name="line.744"></a>
+<span class="sourceLineNo">745</span>            return new ClearTextMessage(decrypted != null ? decrypted.getBody() : null, message, info);<a name="line.745"></a>
+<span class="sourceLineNo">746</span>        } else {<a name="line.746"></a>
+<span class="sourceLineNo">747</span>            LOGGER.log(Level.WARNING, "Stanza does not contain an OMEMO message.");<a name="line.747"></a>
+<span class="sourceLineNo">748</span>            return null;<a name="line.748"></a>
+<span class="sourceLineNo">749</span>        }<a name="line.749"></a>
+<span class="sourceLineNo">750</span>    }<a name="line.750"></a>
+<span class="sourceLineNo">751</span><a name="line.751"></a>
+<span class="sourceLineNo">752</span>    /**<a name="line.752"></a>
+<span class="sourceLineNo">753</span>     * Encrypt a clear text message for the given recipient.<a name="line.753"></a>
+<span class="sourceLineNo">754</span>     * The body of the message will be encrypted.<a name="line.754"></a>
+<span class="sourceLineNo">755</span>     *<a name="line.755"></a>
+<span class="sourceLineNo">756</span>     * @param omemoManager omemoManager of the sending device<a name="line.756"></a>
+<span class="sourceLineNo">757</span>     * @param recipient BareJid of the recipient<a name="line.757"></a>
+<span class="sourceLineNo">758</span>     * @param message   message to encrypt.<a name="line.758"></a>
+<span class="sourceLineNo">759</span>     * @return OmemoMessageElement<a name="line.759"></a>
+<span class="sourceLineNo">760</span>     * @throws CryptoFailedException<a name="line.760"></a>
+<span class="sourceLineNo">761</span>     * @throws UndecidedOmemoIdentityException<a name="line.761"></a>
+<span class="sourceLineNo">762</span>     * @throws NoSuchAlgorithmException<a name="line.762"></a>
+<span class="sourceLineNo">763</span>     */<a name="line.763"></a>
+<span class="sourceLineNo">764</span>    OmemoVAxolotlElement processSendingMessage(OmemoManager omemoManager, BareJid recipient, Message message)<a name="line.764"></a>
+<span class="sourceLineNo">765</span>            throws CryptoFailedException, UndecidedOmemoIdentityException, NoSuchAlgorithmException, SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException, CannotEstablishOmemoSessionException {<a name="line.765"></a>
+<span class="sourceLineNo">766</span>        ArrayList&lt;BareJid&gt; recipients = new ArrayList&lt;&gt;();<a name="line.766"></a>
+<span class="sourceLineNo">767</span>        recipients.add(recipient);<a name="line.767"></a>
+<span class="sourceLineNo">768</span>        return processSendingMessage(omemoManager, recipients, message);<a name="line.768"></a>
+<span class="sourceLineNo">769</span>    }<a name="line.769"></a>
+<span class="sourceLineNo">770</span><a name="line.770"></a>
+<span class="sourceLineNo">771</span>    /**<a name="line.771"></a>
+<span class="sourceLineNo">772</span>     * Encrypt a clear text message for the given recipients.<a name="line.772"></a>
+<span class="sourceLineNo">773</span>     * The body of the message will be encrypted.<a name="line.773"></a>
+<span class="sourceLineNo">774</span>     *<a name="line.774"></a>
+<span class="sourceLineNo">775</span>     * @param omemoManager omemoManager of the sending device.<a name="line.775"></a>
+<span class="sourceLineNo">776</span>     * @param recipients List of BareJids of all recipients<a name="line.776"></a>
+<span class="sourceLineNo">777</span>     * @param message    message to encrypt.<a name="line.777"></a>
+<span class="sourceLineNo">778</span>     * @return OmemoMessageElement<a name="line.778"></a>
+<span class="sourceLineNo">779</span>     * @throws CryptoFailedException<a name="line.779"></a>
+<span class="sourceLineNo">780</span>     * @throws UndecidedOmemoIdentityException<a name="line.780"></a>
+<span class="sourceLineNo">781</span>     * @throws NoSuchAlgorithmException<a name="line.781"></a>
+<span class="sourceLineNo">782</span>     */<a name="line.782"></a>
+<span class="sourceLineNo">783</span>    OmemoVAxolotlElement processSendingMessage(OmemoManager omemoManager, ArrayList&lt;BareJid&gt; recipients, Message message)<a name="line.783"></a>
+<span class="sourceLineNo">784</span>            throws CryptoFailedException, UndecidedOmemoIdentityException, NoSuchAlgorithmException, SmackException.NotConnectedException, InterruptedException, SmackException.NoResponseException, CannotEstablishOmemoSessionException {<a name="line.784"></a>
+<span class="sourceLineNo">785</span><a name="line.785"></a>
+<span class="sourceLineNo">786</span>        CannotEstablishOmemoSessionException sessionException = null;<a name="line.786"></a>
+<span class="sourceLineNo">787</span>        // Them - The contact wants to read the message on all their devices.<a name="line.787"></a>
+<span class="sourceLineNo">788</span>        HashMap&lt;BareJid, ArrayList&lt;OmemoDevice&gt;&gt; receivers = new HashMap&lt;&gt;();<a name="line.788"></a>
+<span class="sourceLineNo">789</span>        for (BareJid recipient : recipients) {<a name="line.789"></a>
+<span class="sourceLineNo">790</span>            try {<a name="line.790"></a>
+<span class="sourceLineNo">791</span>                buildOrCreateOmemoSessionsFromBundles(omemoManager, recipient);<a name="line.791"></a>
+<span class="sourceLineNo">792</span>            } catch (CannotEstablishOmemoSessionException e) {<a name="line.792"></a>
+<span class="sourceLineNo">793</span><a name="line.793"></a>
+<span class="sourceLineNo">794</span>                if (sessionException == null) {<a name="line.794"></a>
+<span class="sourceLineNo">795</span>                    sessionException = e;<a name="line.795"></a>
+<span class="sourceLineNo">796</span>                } else {<a name="line.796"></a>
+<span class="sourceLineNo">797</span>                    sessionException.addFailures(e);<a name="line.797"></a>
+<span class="sourceLineNo">798</span>                }<a name="line.798"></a>
+<span class="sourceLineNo">799</span>            }<a name="line.799"></a>
+<span class="sourceLineNo">800</span>        }<a name="line.800"></a>
+<span class="sourceLineNo">801</span><a name="line.801"></a>
+<span class="sourceLineNo">802</span>        for (BareJid recipient : recipients) {<a name="line.802"></a>
+<span class="sourceLineNo">803</span>            CachedDeviceList theirDevices = getOmemoStoreBackend().loadCachedDeviceList(omemoManager, recipient);<a name="line.803"></a>
+<span class="sourceLineNo">804</span>            ArrayList&lt;OmemoDevice&gt; receivingDevices = new ArrayList&lt;&gt;();<a name="line.804"></a>
+<span class="sourceLineNo">805</span>            for (int id : theirDevices.getActiveDevices()) {<a name="line.805"></a>
+<span class="sourceLineNo">806</span>                OmemoDevice recipientDevice = new OmemoDevice(recipient, id);<a name="line.806"></a>
+<span class="sourceLineNo">807</span><a name="line.807"></a>
+<span class="sourceLineNo">808</span>                if (getOmemoStoreBackend().containsRawSession(omemoManager, recipientDevice)) {<a name="line.808"></a>
+<span class="sourceLineNo">809</span>                    receivingDevices.add(recipientDevice);<a name="line.809"></a>
+<span class="sourceLineNo">810</span>                }<a name="line.810"></a>
+<span class="sourceLineNo">811</span><a name="line.811"></a>
+<span class="sourceLineNo">812</span>                if (sessionException != null) {<a name="line.812"></a>
+<span class="sourceLineNo">813</span>                    sessionException.addSuccess(recipientDevice);<a name="line.813"></a>
+<span class="sourceLineNo">814</span>                }<a name="line.814"></a>
+<span class="sourceLineNo">815</span>            }<a name="line.815"></a>
+<span class="sourceLineNo">816</span><a name="line.816"></a>
+<span class="sourceLineNo">817</span>            if (!receivingDevices.isEmpty()) {<a name="line.817"></a>
+<span class="sourceLineNo">818</span>                receivers.put(recipient, receivingDevices);<a name="line.818"></a>
+<span class="sourceLineNo">819</span>            }<a name="line.819"></a>
+<span class="sourceLineNo">820</span>        }<a name="line.820"></a>
+<span class="sourceLineNo">821</span><a name="line.821"></a>
+<span class="sourceLineNo">822</span>        // Us - We want to read the message on all of our devices<a name="line.822"></a>
+<span class="sourceLineNo">823</span>        CachedDeviceList ourDevices = getOmemoStoreBackend().loadCachedDeviceList(omemoManager, omemoManager.getOwnJid());<a name="line.823"></a>
+<span class="sourceLineNo">824</span>        if (ourDevices == null) {<a name="line.824"></a>
+<span class="sourceLineNo">825</span>            ourDevices = new CachedDeviceList();<a name="line.825"></a>
+<span class="sourceLineNo">826</span>        }<a name="line.826"></a>
+<span class="sourceLineNo">827</span><a name="line.827"></a>
+<span class="sourceLineNo">828</span>        ArrayList&lt;OmemoDevice&gt; ourReceivingDevices = new ArrayList&lt;&gt;();<a name="line.828"></a>
+<span class="sourceLineNo">829</span>        for (int id : ourDevices.getActiveDevices()) {<a name="line.829"></a>
+<span class="sourceLineNo">830</span>            OmemoDevice ourDevice = new OmemoDevice(omemoManager.getOwnJid(), id);<a name="line.830"></a>
+<span class="sourceLineNo">831</span>            if (id == omemoManager.getDeviceId()) {<a name="line.831"></a>
+<span class="sourceLineNo">832</span>                // Don't build session with our exact device.<a name="line.832"></a>
+<span class="sourceLineNo">833</span>                continue;<a name="line.833"></a>
+<span class="sourceLineNo">834</span>            }<a name="line.834"></a>
+<span class="sourceLineNo">835</span><a name="line.835"></a>
+<span class="sourceLineNo">836</span>            Date lastReceived = getOmemoStoreBackend().getDateOfLastReceivedMessage(omemoManager, ourDevice);<a name="line.836"></a>
+<span class="sourceLineNo">837</span>            if (lastReceived == null) {<a name="line.837"></a>
+<span class="sourceLineNo">838</span>                getOmemoStoreBackend().setDateOfLastReceivedMessage(omemoManager, ourDevice);<a name="line.838"></a>
+<span class="sourceLineNo">839</span>                lastReceived = new Date();<a name="line.839"></a>
+<span class="sourceLineNo">840</span>            }<a name="line.840"></a>
+<span class="sourceLineNo">841</span><a name="line.841"></a>
+<span class="sourceLineNo">842</span>            if (OmemoConfiguration.getIgnoreStaleDevices() &amp;&amp; System.currentTimeMillis() - lastReceived.getTime()<a name="line.842"></a>
+<span class="sourceLineNo">843</span>                    &gt; 1000L * 60 * 60 * OmemoConfiguration.getIgnoreStaleDevicesAfterHours()) {<a name="line.843"></a>
+<span class="sourceLineNo">844</span>                LOGGER.log(Level.WARNING, "Refusing to encrypt message for stale device " + ourDevice +<a name="line.844"></a>
+<span class="sourceLineNo">845</span>                        " which was inactive for at least " + OmemoConfiguration.getIgnoreStaleDevicesAfterHours() +<a name="line.845"></a>
+<span class="sourceLineNo">846</span>                        " hours.");<a name="line.846"></a>
+<span class="sourceLineNo">847</span>            } else {<a name="line.847"></a>
+<span class="sourceLineNo">848</span>                if (getOmemoStoreBackend().containsRawSession(omemoManager, ourDevice)) {<a name="line.848"></a>
+<span class="sourceLineNo">849</span>                    ourReceivingDevices.add(ourDevice);<a name="line.849"></a>
+<span class="sourceLineNo">850</span>                }<a name="line.850"></a>
+<span class="sourceLineNo">851</span>            }<a name="line.851"></a>
+<span class="sourceLineNo">852</span>        }<a name="line.852"></a>
+<span class="sourceLineNo">853</span><a name="line.853"></a>
+<span class="sourceLineNo">854</span>        if (!ourReceivingDevices.isEmpty()) {<a name="line.854"></a>
+<span class="sourceLineNo">855</span>            receivers.put(omemoManager.getOwnJid(), ourReceivingDevices);<a name="line.855"></a>
+<span class="sourceLineNo">856</span>        }<a name="line.856"></a>
+<span class="sourceLineNo">857</span><a name="line.857"></a>
+<span class="sourceLineNo">858</span>        if (sessionException != null &amp;&amp; sessionException.requiresThrowing()) {<a name="line.858"></a>
+<span class="sourceLineNo">859</span>            throw sessionException;<a name="line.859"></a>
+<span class="sourceLineNo">860</span>        }<a name="line.860"></a>
+<span class="sourceLineNo">861</span><a name="line.861"></a>
+<span class="sourceLineNo">862</span>        return encryptOmemoMessage(omemoManager, receivers, message);<a name="line.862"></a>
+<span class="sourceLineNo">863</span>    }<a name="line.863"></a>
+<span class="sourceLineNo">864</span><a name="line.864"></a>
+<span class="sourceLineNo">865</span>    /**<a name="line.865"></a>
+<span class="sourceLineNo">866</span>     * Decrypt a incoming OmemoMessageElement that was sent by the OmemoDevice 'from'.<a name="line.866"></a>
+<span class="sourceLineNo">867</span>     *<a name="line.867"></a>
+<span class="sourceLineNo">868</span>     * @param omemoManager omemoManager of the decrypting device.<a name="line.868"></a>
+<span class="sourceLineNo">869</span>     * @param from          OmemoDevice that sent the message<a name="line.869"></a>
+<span class="sourceLineNo">870</span>     * @param message       Encrypted OmemoMessageElement<a name="line.870"></a>
+<span class="sourceLineNo">871</span>     * @param information   OmemoMessageInformation object which will contain metadata about the encryption<a name="line.871"></a>
+<span class="sourceLineNo">872</span>     * @return Decrypted message<a name="line.872"></a>
+<span class="sourceLineNo">873</span>     * @throws CryptoFailedException when decrypting message fails for some reason<a name="line.873"></a>
+<span class="sourceLineNo">874</span>     * @throws InterruptedException<a name="line.874"></a>
+<span class="sourceLineNo">875</span>     * @throws CorruptedOmemoKeyException<a name="line.875"></a>
+<span class="sourceLineNo">876</span>     * @throws XMPPException.XMPPErrorException<a name="line.876"></a>
+<span class="sourceLineNo">877</span>     * @throws SmackException.NotConnectedException<a name="line.877"></a>
+<span class="sourceLineNo">878</span>     * @throws SmackException.NoResponseException<a name="line.878"></a>
+<span class="sourceLineNo">879</span>     * @throws NoRawSessionException<a name="line.879"></a>
+<span class="sourceLineNo">880</span>     */<a name="line.880"></a>
+<span class="sourceLineNo">881</span>    private Message decryptOmemoMessageElement(OmemoManager omemoManager, OmemoDevice from, OmemoElement message,<a name="line.881"></a>
+<span class="sourceLineNo">882</span>                                               final OmemoMessageInformation information)<a name="line.882"></a>
+<span class="sourceLineNo">883</span>            throws CryptoFailedException, InterruptedException, CorruptedOmemoKeyException, XMPPException.XMPPErrorException,<a name="line.883"></a>
+<span class="sourceLineNo">884</span>            SmackException.NotConnectedException, SmackException.NoResponseException, NoRawSessionException {<a name="line.884"></a>
+<span class="sourceLineNo">885</span><a name="line.885"></a>
+<span class="sourceLineNo">886</span>        CipherAndAuthTag transportedKey = decryptTransportedOmemoKey(omemoManager, from, message, information);<a name="line.886"></a>
+<span class="sourceLineNo">887</span>        return OmemoSession.decryptMessageElement(message, transportedKey);<a name="line.887"></a>
+<span class="sourceLineNo">888</span>    }<a name="line.888"></a>
+<span class="sourceLineNo">889</span><a name="line.889"></a>
+<span class="sourceLineNo">890</span>    /**<a name="line.890"></a>
+<span class="sourceLineNo">891</span>     * Decrypt a messageKey that was transported in an OmemoElement.<a name="line.891"></a>
+<span class="sourceLineNo">892</span>     *<a name="line.892"></a>
+<span class="sourceLineNo">893</span>     * @param omemoManager  omemoManager of the receiving device.<a name="line.893"></a>
+<span class="sourceLineNo">894</span>     * @param sender        omemoDevice of the sender.<a name="line.894"></a>
+<span class="sourceLineNo">895</span>     * @param omemoMessage  omemoElement containing the key.<a name="line.895"></a>
+<span class="sourceLineNo">896</span>     * @param messageInfo   omemoMessageInformation that will contain metadata about the encryption.<a name="line.896"></a>
+<span class="sourceLineNo">897</span>     * @return a CipherAndAuthTag pair<a name="line.897"></a>
+<span class="sourceLineNo">898</span>     * @throws CryptoFailedException<a name="line.898"></a>
+<span class="sourceLineNo">899</span>     * @throws NoRawSessionException<a name="line.899"></a>
+<span class="sourceLineNo">900</span>     * @throws InterruptedException<a name="line.900"></a>
+<span class="sourceLineNo">901</span>     * @throws CorruptedOmemoKeyException<a name="line.901"></a>
+<span class="sourceLineNo">902</span>     * @throws XMPPException.XMPPErrorException<a name="line.902"></a>
+<span class="sourceLineNo">903</span>     * @throws SmackException.NotConnectedException<a name="line.903"></a>
+<span class="sourceLineNo">904</span>     * @throws SmackException.NoResponseException<a name="line.904"></a>
+<span class="sourceLineNo">905</span>     */<a name="line.905"></a>
+<span class="sourceLineNo">906</span>    private CipherAndAuthTag decryptTransportedOmemoKey(OmemoManager omemoManager, OmemoDevice  sender,<a name="line.906"></a>
+<span class="sourceLineNo">907</span>                                                        OmemoElement omemoMessage,<a name="line.907"></a>
+<span class="sourceLineNo">908</span>                                                        OmemoMessageInformation messageInfo)<a name="line.908"></a>
+<span class="sourceLineNo">909</span>            throws CryptoFailedException, NoRawSessionException, InterruptedException, CorruptedOmemoKeyException,<a name="line.909"></a>
+<span class="sourceLineNo">910</span>            XMPPException.XMPPErrorException, SmackException.NotConnectedException, SmackException.NoResponseException {<a name="line.910"></a>
+<span class="sourceLineNo">911</span><a name="line.911"></a>
+<span class="sourceLineNo">912</span>        int preKeyCountBefore = getOmemoStoreBackend().loadOmemoPreKeys(omemoManager).size();<a name="line.912"></a>
+<span class="sourceLineNo">913</span><a name="line.913"></a>
+<span class="sourceLineNo">914</span>        OmemoSession&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.914"></a>
+<span class="sourceLineNo">915</span>                session = getOmemoStoreBackend().getOmemoSessionOf(omemoManager, sender);<a name="line.915"></a>
+<span class="sourceLineNo">916</span>        CipherAndAuthTag cipherAndAuthTag = session.decryptTransportedKey(omemoMessage, omemoManager.getDeviceId());<a name="line.916"></a>
+<span class="sourceLineNo">917</span><a name="line.917"></a>
+<span class="sourceLineNo">918</span>        messageInfo.setSenderDevice(sender);<a name="line.918"></a>
+<span class="sourceLineNo">919</span>        messageInfo.setSenderIdentityKey(new IdentityKeyWrapper(session.getIdentityKey()));<a name="line.919"></a>
+<span class="sourceLineNo">920</span><a name="line.920"></a>
+<span class="sourceLineNo">921</span>        if (preKeyCountBefore != getOmemoStoreBackend().loadOmemoPreKeys(omemoManager).size()) {<a name="line.921"></a>
+<span class="sourceLineNo">922</span>            LOGGER.log(Level.INFO, "We used up a preKey. Publish new Bundle.");<a name="line.922"></a>
+<span class="sourceLineNo">923</span>            publishBundle(omemoManager);<a name="line.923"></a>
+<span class="sourceLineNo">924</span>        }<a name="line.924"></a>
+<span class="sourceLineNo">925</span>        return cipherAndAuthTag;<a name="line.925"></a>
+<span class="sourceLineNo">926</span>    }<a name="line.926"></a>
+<span class="sourceLineNo">927</span><a name="line.927"></a>
+<span class="sourceLineNo">928</span>    /**<a name="line.928"></a>
+<span class="sourceLineNo">929</span>     * Encrypt the message and return it as an OmemoMessageElement.<a name="line.929"></a>
+<span class="sourceLineNo">930</span>     *<a name="line.930"></a>
+<span class="sourceLineNo">931</span>     * @param omemoManager omemoManager of the encrypting device.<a name="line.931"></a>
+<span class="sourceLineNo">932</span>     * @param recipients List of devices that will be able to decipher the message.<a name="line.932"></a>
+<span class="sourceLineNo">933</span>     * @param message   Clear text message<a name="line.933"></a>
+<span class="sourceLineNo">934</span>     *<a name="line.934"></a>
+<span class="sourceLineNo">935</span>     * @throws CryptoFailedException when some cryptographic function fails<a name="line.935"></a>
+<span class="sourceLineNo">936</span>     * @throws UndecidedOmemoIdentityException when the identity of one or more contacts is undecided<a name="line.936"></a>
+<span class="sourceLineNo">937</span>     *<a name="line.937"></a>
+<span class="sourceLineNo">938</span>     * @return OmemoMessageElement<a name="line.938"></a>
+<span class="sourceLineNo">939</span>     */<a name="line.939"></a>
+<span class="sourceLineNo">940</span>    OmemoVAxolotlElement encryptOmemoMessage(OmemoManager omemoManager, HashMap&lt;BareJid, ArrayList&lt;OmemoDevice&gt;&gt; recipients, Message message)<a name="line.940"></a>
+<span class="sourceLineNo">941</span>            throws CryptoFailedException, UndecidedOmemoIdentityException {<a name="line.941"></a>
+<span class="sourceLineNo">942</span><a name="line.942"></a>
+<span class="sourceLineNo">943</span>        OmemoMessageBuilder&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.943"></a>
+<span class="sourceLineNo">944</span>                builder;<a name="line.944"></a>
+<span class="sourceLineNo">945</span>        try {<a name="line.945"></a>
+<span class="sourceLineNo">946</span>            builder = new OmemoMessageBuilder&lt;&gt;(omemoManager, getOmemoStoreBackend(), message.getBody());<a name="line.946"></a>
+<span class="sourceLineNo">947</span>        } catch (UnsupportedEncodingException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException |<a name="line.947"></a>
+<span class="sourceLineNo">948</span>                NoSuchPaddingException | InvalidAlgorithmParameterException | InvalidKeyException | NoSuchAlgorithmException e) {<a name="line.948"></a>
+<span class="sourceLineNo">949</span>            throw new CryptoFailedException(e);<a name="line.949"></a>
+<span class="sourceLineNo">950</span>        }<a name="line.950"></a>
+<span class="sourceLineNo">951</span><a name="line.951"></a>
+<span class="sourceLineNo">952</span>        UndecidedOmemoIdentityException undecided = null;<a name="line.952"></a>
+<span class="sourceLineNo">953</span><a name="line.953"></a>
+<span class="sourceLineNo">954</span>        for (Map.Entry&lt;BareJid, ArrayList&lt;OmemoDevice&gt;&gt; entry : recipients.entrySet()) {<a name="line.954"></a>
+<span class="sourceLineNo">955</span>            for (OmemoDevice c : entry.getValue()) {<a name="line.955"></a>
+<span class="sourceLineNo">956</span>                try {<a name="line.956"></a>
+<span class="sourceLineNo">957</span>                    builder.addRecipient(c);<a name="line.957"></a>
+<span class="sourceLineNo">958</span>                } catch (CorruptedOmemoKeyException e) {<a name="line.958"></a>
+<span class="sourceLineNo">959</span>                    // TODO: How to react?<a name="line.959"></a>
+<span class="sourceLineNo">960</span>                    LOGGER.log(Level.SEVERE, "encryptOmemoMessage failed to establish a session with device "<a name="line.960"></a>
+<span class="sourceLineNo">961</span>                            + c + ": " + e.getMessage());<a name="line.961"></a>
+<span class="sourceLineNo">962</span>                } catch (UndecidedOmemoIdentityException e) {<a name="line.962"></a>
+<span class="sourceLineNo">963</span>                    // Collect all undecided devices<a name="line.963"></a>
+<span class="sourceLineNo">964</span>                    if (undecided == null) {<a name="line.964"></a>
+<span class="sourceLineNo">965</span>                        undecided = e;<a name="line.965"></a>
+<span class="sourceLineNo">966</span>                    } else {<a name="line.966"></a>
+<span class="sourceLineNo">967</span>                        undecided.join(e);<a name="line.967"></a>
+<span class="sourceLineNo">968</span>                    }<a name="line.968"></a>
+<span class="sourceLineNo">969</span>                }<a name="line.969"></a>
+<span class="sourceLineNo">970</span>            }<a name="line.970"></a>
+<span class="sourceLineNo">971</span>        }<a name="line.971"></a>
+<span class="sourceLineNo">972</span><a name="line.972"></a>
+<span class="sourceLineNo">973</span>        if (undecided != null) {<a name="line.973"></a>
+<span class="sourceLineNo">974</span>            throw undecided;<a name="line.974"></a>
+<span class="sourceLineNo">975</span>        }<a name="line.975"></a>
+<span class="sourceLineNo">976</span><a name="line.976"></a>
+<span class="sourceLineNo">977</span>        return builder.finish();<a name="line.977"></a>
+<span class="sourceLineNo">978</span>    }<a name="line.978"></a>
+<span class="sourceLineNo">979</span><a name="line.979"></a>
+<span class="sourceLineNo">980</span>    /**<a name="line.980"></a>
+<span class="sourceLineNo">981</span>     * Prepares a keyTransportElement with a random aes key and iv.<a name="line.981"></a>
+<span class="sourceLineNo">982</span>     *<a name="line.982"></a>
+<span class="sourceLineNo">983</span>     * @param omemoManager omemoManager of the sending device.<a name="line.983"></a>
+<span class="sourceLineNo">984</span>     * @param recipients recipients of the omemoKeyTransportElement<a name="line.984"></a>
+<span class="sourceLineNo">985</span>     * @return KeyTransportElement<a name="line.985"></a>
+<span class="sourceLineNo">986</span>     * @throws CryptoFailedException<a name="line.986"></a>
+<span class="sourceLineNo">987</span>     * @throws UndecidedOmemoIdentityException<a name="line.987"></a>
+<span class="sourceLineNo">988</span>     * @throws CorruptedOmemoKeyException<a name="line.988"></a>
+<span class="sourceLineNo">989</span>     * @throws CannotEstablishOmemoSessionException<a name="line.989"></a>
+<span class="sourceLineNo">990</span>     */<a name="line.990"></a>
+<span class="sourceLineNo">991</span>    OmemoVAxolotlElement prepareOmemoKeyTransportElement(OmemoManager omemoManager, OmemoDevice... recipients) throws CryptoFailedException,<a name="line.991"></a>
+<span class="sourceLineNo">992</span>            UndecidedOmemoIdentityException, CorruptedOmemoKeyException, CannotEstablishOmemoSessionException {<a name="line.992"></a>
+<span class="sourceLineNo">993</span><a name="line.993"></a>
+<span class="sourceLineNo">994</span>        OmemoMessageBuilder&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.994"></a>
+<span class="sourceLineNo">995</span>                builder;<a name="line.995"></a>
+<span class="sourceLineNo">996</span>        try {<a name="line.996"></a>
+<span class="sourceLineNo">997</span>            builder = new OmemoMessageBuilder&lt;&gt;(omemoManager, getOmemoStoreBackend(), null);<a name="line.997"></a>
+<span class="sourceLineNo">998</span><a name="line.998"></a>
+<span class="sourceLineNo">999</span>        } catch (UnsupportedEncodingException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException |<a name="line.999"></a>
+<span class="sourceLineNo">1000</span>                NoSuchPaddingException | InvalidAlgorithmParameterException | InvalidKeyException | NoSuchAlgorithmException e) {<a name="line.1000"></a>
+<span class="sourceLineNo">1001</span>            throw new CryptoFailedException(e);<a name="line.1001"></a>
+<span class="sourceLineNo">1002</span>        }<a name="line.1002"></a>
+<span class="sourceLineNo">1003</span><a name="line.1003"></a>
+<span class="sourceLineNo">1004</span>        for (OmemoDevice r : recipients) {<a name="line.1004"></a>
+<span class="sourceLineNo">1005</span>            builder.addRecipient(r);<a name="line.1005"></a>
+<span class="sourceLineNo">1006</span>        }<a name="line.1006"></a>
+<span class="sourceLineNo">1007</span><a name="line.1007"></a>
+<span class="sourceLineNo">1008</span>        return builder.finish();<a name="line.1008"></a>
+<span class="sourceLineNo">1009</span>    }<a name="line.1009"></a>
+<span class="sourceLineNo">1010</span><a name="line.1010"></a>
+<span class="sourceLineNo">1011</span>    /**<a name="line.1011"></a>
+<span class="sourceLineNo">1012</span>     * Prepare a KeyTransportElement with aesKey and iv.<a name="line.1012"></a>
+<span class="sourceLineNo">1013</span>     *<a name="line.1013"></a>
+<span class="sourceLineNo">1014</span>     * @param omemoManager  OmemoManager of the sending device.<a name="line.1014"></a>
+<span class="sourceLineNo">1015</span>     * @param aesKey        AES key<a name="line.1015"></a>
+<span class="sourceLineNo">1016</span>     * @param iv            initialization vector<a name="line.1016"></a>
+<span class="sourceLineNo">1017</span>     * @param recipients    recipients<a name="line.1017"></a>
+<span class="sourceLineNo">1018</span>     * @return              KeyTransportElement<a name="line.1018"></a>
+<span class="sourceLineNo">1019</span>     * @throws CryptoFailedException<a name="line.1019"></a>
+<span class="sourceLineNo">1020</span>     * @throws UndecidedOmemoIdentityException<a name="line.1020"></a>
+<span class="sourceLineNo">1021</span>     * @throws CorruptedOmemoKeyException<a name="line.1021"></a>
+<span class="sourceLineNo">1022</span>     * @throws CannotEstablishOmemoSessionException<a name="line.1022"></a>
+<span class="sourceLineNo">1023</span>     */<a name="line.1023"></a>
+<span class="sourceLineNo">1024</span>    OmemoVAxolotlElement prepareOmemoKeyTransportElement(OmemoManager omemoManager, byte[] aesKey, byte[] iv, OmemoDevice... recipients) throws CryptoFailedException,<a name="line.1024"></a>
+<span class="sourceLineNo">1025</span>            UndecidedOmemoIdentityException, CorruptedOmemoKeyException, CannotEstablishOmemoSessionException {<a name="line.1025"></a>
+<span class="sourceLineNo">1026</span><a name="line.1026"></a>
+<span class="sourceLineNo">1027</span>        OmemoMessageBuilder&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.1027"></a>
+<span class="sourceLineNo">1028</span>                builder;<a name="line.1028"></a>
+<span class="sourceLineNo">1029</span>        try {<a name="line.1029"></a>
+<span class="sourceLineNo">1030</span>            builder = new OmemoMessageBuilder&lt;&gt;(omemoManager, getOmemoStoreBackend(), aesKey, iv);<a name="line.1030"></a>
+<span class="sourceLineNo">1031</span><a name="line.1031"></a>
+<span class="sourceLineNo">1032</span>        } catch (UnsupportedEncodingException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException |<a name="line.1032"></a>
+<span class="sourceLineNo">1033</span>                NoSuchPaddingException | InvalidAlgorithmParameterException | InvalidKeyException | NoSuchAlgorithmException e) {<a name="line.1033"></a>
+<span class="sourceLineNo">1034</span>            throw new CryptoFailedException(e);<a name="line.1034"></a>
+<span class="sourceLineNo">1035</span>        }<a name="line.1035"></a>
+<span class="sourceLineNo">1036</span><a name="line.1036"></a>
+<span class="sourceLineNo">1037</span>        for (OmemoDevice r : recipients) {<a name="line.1037"></a>
+<span class="sourceLineNo">1038</span>            builder.addRecipient(r);<a name="line.1038"></a>
+<span class="sourceLineNo">1039</span>        }<a name="line.1039"></a>
+<span class="sourceLineNo">1040</span><a name="line.1040"></a>
+<span class="sourceLineNo">1041</span>        return builder.finish();<a name="line.1041"></a>
+<span class="sourceLineNo">1042</span>    }<a name="line.1042"></a>
+<span class="sourceLineNo">1043</span><a name="line.1043"></a>
+<span class="sourceLineNo">1044</span>    /**<a name="line.1044"></a>
+<span class="sourceLineNo">1045</span>     * Return a new RatchetUpdateMessage.<a name="line.1045"></a>
+<span class="sourceLineNo">1046</span>     *<a name="line.1046"></a>
+<span class="sourceLineNo">1047</span>     * @param omemoManager  omemoManager of the sending device.<a name="line.1047"></a>
+<span class="sourceLineNo">1048</span>     * @param recipient     recipient<a name="line.1048"></a>
+<span class="sourceLineNo">1049</span>     * @param preKeyMessage if true, a new session will be built for this message (useful to repair broken sessions)<a name="line.1049"></a>
+<span class="sourceLineNo">1050</span>     *                      otherwise the message will be encrypted using the existing session.<a name="line.1050"></a>
+<span class="sourceLineNo">1051</span>     * @return              OmemoRatchetUpdateMessage<a name="line.1051"></a>
+<span class="sourceLineNo">1052</span>     * @throws CannotEstablishOmemoSessionException<a name="line.1052"></a>
+<span class="sourceLineNo">1053</span>     * @throws CorruptedOmemoKeyException<a name="line.1053"></a>
+<span class="sourceLineNo">1054</span>     * @throws CryptoFailedException<a name="line.1054"></a>
+<span class="sourceLineNo">1055</span>     * @throws UndecidedOmemoIdentityException<a name="line.1055"></a>
+<span class="sourceLineNo">1056</span>     */<a name="line.1056"></a>
+<span class="sourceLineNo">1057</span>    protected Message getOmemoRatchetUpdateMessage(OmemoManager omemoManager, OmemoDevice recipient, boolean preKeyMessage) throws CannotEstablishOmemoSessionException, CorruptedOmemoKeyException, CryptoFailedException, UndecidedOmemoIdentityException {<a name="line.1057"></a>
+<span class="sourceLineNo">1058</span>        if (preKeyMessage) {<a name="line.1058"></a>
+<span class="sourceLineNo">1059</span>            buildSessionFromOmemoBundle(omemoManager, recipient, true);<a name="line.1059"></a>
+<span class="sourceLineNo">1060</span>        }<a name="line.1060"></a>
+<span class="sourceLineNo">1061</span><a name="line.1061"></a>
+<span class="sourceLineNo">1062</span>        OmemoVAxolotlElement keyTransportElement = prepareOmemoKeyTransportElement(omemoManager, recipient);<a name="line.1062"></a>
+<span class="sourceLineNo">1063</span>        Message ratchetUpdateMessage = omemoManager.finishMessage(keyTransportElement);<a name="line.1063"></a>
+<span class="sourceLineNo">1064</span>        ratchetUpdateMessage.setTo(recipient.getJid());<a name="line.1064"></a>
+<span class="sourceLineNo">1065</span><a name="line.1065"></a>
+<span class="sourceLineNo">1066</span>        return ratchetUpdateMessage;<a name="line.1066"></a>
+<span class="sourceLineNo">1067</span>    }<a name="line.1067"></a>
+<span class="sourceLineNo">1068</span><a name="line.1068"></a>
+<span class="sourceLineNo">1069</span>    /**<a name="line.1069"></a>
+<span class="sourceLineNo">1070</span>     * Send an OmemoRatchetUpdateMessage to recipient. If preKeyMessage is true, the message will be encrypted using a<a name="line.1070"></a>
+<span class="sourceLineNo">1071</span>     * freshly built session. This can be used to repair broken sessions.<a name="line.1071"></a>
+<span class="sourceLineNo">1072</span>     *<a name="line.1072"></a>
+<span class="sourceLineNo">1073</span>     * @param omemoManager      omemoManager of the sending device.<a name="line.1073"></a>
+<span class="sourceLineNo">1074</span>     * @param recipient         recipient<a name="line.1074"></a>
+<span class="sourceLineNo">1075</span>     * @param preKeyMessage     shall this be a preKeyMessage?<a name="line.1075"></a>
+<span class="sourceLineNo">1076</span>     * @throws UndecidedOmemoIdentityException<a name="line.1076"></a>
+<span class="sourceLineNo">1077</span>     * @throws CorruptedOmemoKeyException<a name="line.1077"></a>
+<span class="sourceLineNo">1078</span>     * @throws CryptoFailedException<a name="line.1078"></a>
+<span class="sourceLineNo">1079</span>     * @throws CannotEstablishOmemoSessionException<a name="line.1079"></a>
+<span class="sourceLineNo">1080</span>     */<a name="line.1080"></a>
+<span class="sourceLineNo">1081</span>    protected void sendOmemoRatchetUpdateMessage(OmemoManager omemoManager, OmemoDevice recipient, boolean preKeyMessage) throws UndecidedOmemoIdentityException, CorruptedOmemoKeyException, CryptoFailedException, CannotEstablishOmemoSessionException {<a name="line.1081"></a>
+<span class="sourceLineNo">1082</span>        Message ratchetUpdateMessage = getOmemoRatchetUpdateMessage(omemoManager, recipient, preKeyMessage);<a name="line.1082"></a>
+<span class="sourceLineNo">1083</span><a name="line.1083"></a>
+<span class="sourceLineNo">1084</span>        try {<a name="line.1084"></a>
+<span class="sourceLineNo">1085</span>            omemoManager.getConnection().sendStanza(ratchetUpdateMessage);<a name="line.1085"></a>
+<span class="sourceLineNo">1086</span><a name="line.1086"></a>
+<span class="sourceLineNo">1087</span>        } catch (SmackException.NotConnectedException | InterruptedException e) {<a name="line.1087"></a>
+<span class="sourceLineNo">1088</span>            LOGGER.log(Level.WARNING, "sendOmemoRatchetUpdateMessage failed: " + e.getMessage());<a name="line.1088"></a>
+<span class="sourceLineNo">1089</span>        }<a name="line.1089"></a>
+<span class="sourceLineNo">1090</span>    }<a name="line.1090"></a>
+<span class="sourceLineNo">1091</span><a name="line.1091"></a>
+<span class="sourceLineNo">1092</span>    /**<a name="line.1092"></a>
+<span class="sourceLineNo">1093</span>     * Listen for incoming messages and carbons, decrypt them and pass the cleartext messages to the registered<a name="line.1093"></a>
+<span class="sourceLineNo">1094</span>     * OmemoMessageListeners.<a name="line.1094"></a>
+<span class="sourceLineNo">1095</span>     *<a name="line.1095"></a>
+<span class="sourceLineNo">1096</span>     * @param omemoManager omemoManager we want to register with<a name="line.1096"></a>
+<span class="sourceLineNo">1097</span>     */<a name="line.1097"></a>
+<span class="sourceLineNo">1098</span>    private void registerOmemoMessageStanzaListeners(OmemoManager omemoManager) {<a name="line.1098"></a>
+<span class="sourceLineNo">1099</span>        omemoManager.getConnection().removeAsyncStanzaListener(omemoManager.getOmemoStanzaListener());<a name="line.1099"></a>
+<span class="sourceLineNo">1100</span>        omemoManager.getConnection().addAsyncStanzaListener(omemoManager.getOmemoStanzaListener(), omemoStanzaFilter);<a name="line.1100"></a>
+<span class="sourceLineNo">1101</span><a name="line.1101"></a>
+<span class="sourceLineNo">1102</span>        CarbonManager.getInstanceFor(omemoManager.getConnection()).removeCarbonCopyReceivedListener(omemoManager.getOmemoCarbonCopyListener());<a name="line.1102"></a>
+<span class="sourceLineNo">1103</span>        CarbonManager.getInstanceFor(omemoManager.getConnection()).addCarbonCopyReceivedListener(omemoManager.getOmemoCarbonCopyListener());<a name="line.1103"></a>
+<span class="sourceLineNo">1104</span>    }<a name="line.1104"></a>
+<span class="sourceLineNo">1105</span><a name="line.1105"></a>
+<span class="sourceLineNo">1106</span>    /**<a name="line.1106"></a>
+<span class="sourceLineNo">1107</span>     * StanzaFilter that filters messages containing a OMEMO element.<a name="line.1107"></a>
+<span class="sourceLineNo">1108</span>     */<a name="line.1108"></a>
+<span class="sourceLineNo">1109</span>    private final StanzaFilter omemoStanzaFilter = new StanzaFilter() {<a name="line.1109"></a>
+<span class="sourceLineNo">1110</span>        @Override<a name="line.1110"></a>
+<span class="sourceLineNo">1111</span>        public boolean accept(Stanza stanza) {<a name="line.1111"></a>
+<span class="sourceLineNo">1112</span>            return stanza instanceof Message &amp;&amp; OmemoManager.stanzaContainsOmemoElement(stanza);<a name="line.1112"></a>
+<span class="sourceLineNo">1113</span>        }<a name="line.1113"></a>
+<span class="sourceLineNo">1114</span>    };<a name="line.1114"></a>
+<span class="sourceLineNo">1115</span><a name="line.1115"></a>
+<span class="sourceLineNo">1116</span>    /**<a name="line.1116"></a>
+<span class="sourceLineNo">1117</span>     * Try to decrypt a mamQueryResult. Note that OMEMO messages can only be decrypted once on a device, so if you<a name="line.1117"></a>
+<span class="sourceLineNo">1118</span>     * try to decrypt a message that has been decrypted earlier in time, the decryption will fail. You should handle<a name="line.1118"></a>
+<span class="sourceLineNo">1119</span>     * message history locally when using OMEMO, since you cannot rely on MAM.<a name="line.1119"></a>
+<span class="sourceLineNo">1120</span>     *<a name="line.1120"></a>
+<span class="sourceLineNo">1121</span>     * @param omemoManager omemoManager of the decrypting device.<a name="line.1121"></a>
+<span class="sourceLineNo">1122</span>     * @param mamQueryResult mamQueryResult that shall be decrypted.<a name="line.1122"></a>
+<span class="sourceLineNo">1123</span>     * @return list of decrypted messages.<a name="line.1123"></a>
+<span class="sourceLineNo">1124</span>     * @throws InterruptedException<a name="line.1124"></a>
+<span class="sourceLineNo">1125</span>     * @throws XMPPException.XMPPErrorException<a name="line.1125"></a>
+<span class="sourceLineNo">1126</span>     * @throws SmackException.NotConnectedException<a name="line.1126"></a>
+<span class="sourceLineNo">1127</span>     * @throws SmackException.NoResponseException<a name="line.1127"></a>
+<span class="sourceLineNo">1128</span>     */<a name="line.1128"></a>
+<span class="sourceLineNo">1129</span>    List&lt;ClearTextMessage&gt; decryptMamQueryResult(OmemoManager omemoManager, MamManager.MamQuery mamQuery)<a name="line.1129"></a>
+<span class="sourceLineNo">1130</span>            throws InterruptedException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, SmackException.NoResponseException {<a name="line.1130"></a>
+<span class="sourceLineNo">1131</span>        List&lt;ClearTextMessage&gt; result = new ArrayList&lt;&gt;();<a name="line.1131"></a>
+<span class="sourceLineNo">1132</span>        for (Message message : mamQuery.getMessages()) {<a name="line.1132"></a>
+<span class="sourceLineNo">1133</span>            if (OmemoManager.stanzaContainsOmemoElement(message)) {<a name="line.1133"></a>
+<span class="sourceLineNo">1134</span>                // Decrypt OMEMO messages<a name="line.1134"></a>
+<span class="sourceLineNo">1135</span>                try {<a name="line.1135"></a>
+<span class="sourceLineNo">1136</span>                    result.add(processLocalMessage(omemoManager, message.getFrom().asBareJid(), message));<a name="line.1136"></a>
+<span class="sourceLineNo">1137</span>                } catch (NoRawSessionException | CorruptedOmemoKeyException | CryptoFailedException e) {<a name="line.1137"></a>
+<span class="sourceLineNo">1138</span>                    LOGGER.log(Level.WARNING, "decryptMamQueryResult failed to decrypt message from "<a name="line.1138"></a>
+<span class="sourceLineNo">1139</span>                            + message.getFrom() + " due to corrupted session/key: " + e.getMessage());<a name="line.1139"></a>
+<span class="sourceLineNo">1140</span>                }<a name="line.1140"></a>
+<span class="sourceLineNo">1141</span>            } else {<a name="line.1141"></a>
+<span class="sourceLineNo">1142</span>                // Wrap cleartext messages<a name="line.1142"></a>
+<span class="sourceLineNo">1143</span>                Message m = message;<a name="line.1143"></a>
+<span class="sourceLineNo">1144</span>                result.add(new ClearTextMessage(m.getBody(), m,<a name="line.1144"></a>
+<span class="sourceLineNo">1145</span>                        new OmemoMessageInformation(null, null, OmemoMessageInformation.CARBON.NONE, false)));<a name="line.1145"></a>
+<span class="sourceLineNo">1146</span>            }<a name="line.1146"></a>
+<span class="sourceLineNo">1147</span>        }<a name="line.1147"></a>
+<span class="sourceLineNo">1148</span>        return result;<a name="line.1148"></a>
+<span class="sourceLineNo">1149</span>    }<a name="line.1149"></a>
+<span class="sourceLineNo">1150</span><a name="line.1150"></a>
+<span class="sourceLineNo">1151</span>    /**<a name="line.1151"></a>
+<span class="sourceLineNo">1152</span>     * Return the barejid of the user that sent the message inside the MUC. If the message wasn't sent in a MUC,<a name="line.1152"></a>
+<span class="sourceLineNo">1153</span>     * return null;<a name="line.1153"></a>
+<span class="sourceLineNo">1154</span>     *<a name="line.1154"></a>
+<span class="sourceLineNo">1155</span>     * @param omemoManager omemoManager<a name="line.1155"></a>
+<span class="sourceLineNo">1156</span>     * @param stanza message<a name="line.1156"></a>
+<span class="sourceLineNo">1157</span>     * @return BareJid of the sender.<a name="line.1157"></a>
+<span class="sourceLineNo">1158</span>     */<a name="line.1158"></a>
+<span class="sourceLineNo">1159</span>    private static OmemoDevice getSender(OmemoManager omemoManager, Stanza stanza) {<a name="line.1159"></a>
+<span class="sourceLineNo">1160</span>        OmemoElement omemoElement = stanza.getExtension(OmemoElement.ENCRYPTED, OMEMO_NAMESPACE_V_AXOLOTL);<a name="line.1160"></a>
+<span class="sourceLineNo">1161</span>        Jid sender = stanza.getFrom();<a name="line.1161"></a>
+<span class="sourceLineNo">1162</span>        if (isMucMessage(omemoManager, stanza)) {<a name="line.1162"></a>
+<span class="sourceLineNo">1163</span>            MultiUserChatManager mucm = MultiUserChatManager.getInstanceFor(omemoManager.getConnection());<a name="line.1163"></a>
+<span class="sourceLineNo">1164</span>            MultiUserChat muc = mucm.getMultiUserChat(sender.asEntityBareJidIfPossible());<a name="line.1164"></a>
+<span class="sourceLineNo">1165</span>            sender = muc.getOccupant(sender.asEntityFullJidIfPossible()).getJid().asBareJid();<a name="line.1165"></a>
+<span class="sourceLineNo">1166</span>        }<a name="line.1166"></a>
+<span class="sourceLineNo">1167</span>        if (sender == null) {<a name="line.1167"></a>
+<span class="sourceLineNo">1168</span>            throw new AssertionError("Sender is null.");<a name="line.1168"></a>
+<span class="sourceLineNo">1169</span>        }<a name="line.1169"></a>
+<span class="sourceLineNo">1170</span>        return new OmemoDevice(sender.asBareJid(), omemoElement.getHeader().getSid());<a name="line.1170"></a>
+<span class="sourceLineNo">1171</span>    }<a name="line.1171"></a>
+<span class="sourceLineNo">1172</span><a name="line.1172"></a>
+<span class="sourceLineNo">1173</span>    /**<a name="line.1173"></a>
+<span class="sourceLineNo">1174</span>     * Return true, if the user knows a multiUserChat with a jid matching the sender of the stanza.<a name="line.1174"></a>
+<span class="sourceLineNo">1175</span>     * @param omemoManager  omemoManager of the user<a name="line.1175"></a>
+<span class="sourceLineNo">1176</span>     * @param stanza        stanza in question<a name="line.1176"></a>
+<span class="sourceLineNo">1177</span>     * @return              true if MUC message, otherwise false.<a name="line.1177"></a>
+<span class="sourceLineNo">1178</span>     */<a name="line.1178"></a>
+<span class="sourceLineNo">1179</span>    private static boolean isMucMessage(OmemoManager omemoManager, Stanza stanza) {<a name="line.1179"></a>
+<span class="sourceLineNo">1180</span>        BareJid sender = stanza.getFrom().asBareJid();<a name="line.1180"></a>
+<span class="sourceLineNo">1181</span>        MultiUserChatManager mucm = MultiUserChatManager.getInstanceFor(omemoManager.getConnection());<a name="line.1181"></a>
+<span class="sourceLineNo">1182</span><a name="line.1182"></a>
+<span class="sourceLineNo">1183</span>        return mucm.getJoinedRooms().contains(sender.asEntityBareJidIfPossible());<a name="line.1183"></a>
+<span class="sourceLineNo">1184</span>    }<a name="line.1184"></a>
+<span class="sourceLineNo">1185</span><a name="line.1185"></a>
+<span class="sourceLineNo">1186</span>    OmemoStanzaListener createStanzaListener(OmemoManager omemoManager) {<a name="line.1186"></a>
+<span class="sourceLineNo">1187</span>        return new OmemoStanzaListener(omemoManager, this);<a name="line.1187"></a>
+<span class="sourceLineNo">1188</span>    }<a name="line.1188"></a>
+<span class="sourceLineNo">1189</span><a name="line.1189"></a>
+<span class="sourceLineNo">1190</span>    /**<a name="line.1190"></a>
+<span class="sourceLineNo">1191</span>     * StanzaListener that listens for incoming omemoElements that are NOT send via carbons.<a name="line.1191"></a>
+<span class="sourceLineNo">1192</span>     */<a name="line.1192"></a>
+<span class="sourceLineNo">1193</span>    class OmemoStanzaListener implements StanzaListener {<a name="line.1193"></a>
+<span class="sourceLineNo">1194</span>        private final OmemoManager omemoManager;<a name="line.1194"></a>
+<span class="sourceLineNo">1195</span>        private final OmemoService&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt;<a name="line.1195"></a>
+<span class="sourceLineNo">1196</span>                service;<a name="line.1196"></a>
+<span class="sourceLineNo">1197</span><a name="line.1197"></a>
+<span class="sourceLineNo">1198</span>        OmemoStanzaListener(OmemoManager omemoManager,<a name="line.1198"></a>
+<span class="sourceLineNo">1199</span>                            OmemoService&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; service) {<a name="line.1199"></a>
+<span class="sourceLineNo">1200</span>            this.omemoManager = omemoManager;<a name="line.1200"></a>
+<span class="sourceLineNo">1201</span>            this.service = service;<a name="line.1201"></a>
+<span class="sourceLineNo">1202</span>        }<a name="line.1202"></a>
+<span class="sourceLineNo">1203</span><a name="line.1203"></a>
+<span class="sourceLineNo">1204</span>        @Override<a name="line.1204"></a>
+<span class="sourceLineNo">1205</span>        public void processStanza(Stanza stanza) throws SmackException.NotConnectedException, InterruptedException {<a name="line.1205"></a>
+<span class="sourceLineNo">1206</span>            Message decrypted;<a name="line.1206"></a>
+<span class="sourceLineNo">1207</span>            OmemoElement omemoMessage = stanza.getExtension(OmemoElement.ENCRYPTED, OMEMO_NAMESPACE_V_AXOLOTL);<a name="line.1207"></a>
+<span class="sourceLineNo">1208</span>            OmemoMessageInformation messageInfo = new OmemoMessageInformation();<a name="line.1208"></a>
+<span class="sourceLineNo">1209</span>            MultiUserChatManager mucm = MultiUserChatManager.getInstanceFor(omemoManager.getConnection());<a name="line.1209"></a>
+<span class="sourceLineNo">1210</span>            OmemoDevice senderDevice = getSender(omemoManager, stanza);<a name="line.1210"></a>
+<span class="sourceLineNo">1211</span>            try {<a name="line.1211"></a>
+<span class="sourceLineNo">1212</span>                // Is it a MUC message...<a name="line.1212"></a>
+<span class="sourceLineNo">1213</span>                if (isMucMessage(omemoManager, stanza)) {<a name="line.1213"></a>
+<span class="sourceLineNo">1214</span><a name="line.1214"></a>
+<span class="sourceLineNo">1215</span>                    MultiUserChat muc = mucm.getMultiUserChat(stanza.getFrom().asEntityBareJidIfPossible());<a name="line.1215"></a>
+<span class="sourceLineNo">1216</span>                    if (omemoMessage.isMessageElement()) {<a name="line.1216"></a>
+<span class="sourceLineNo">1217</span><a name="line.1217"></a>
+<span class="sourceLineNo">1218</span>                        decrypted = processReceivingMessage(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1218"></a>
+<span class="sourceLineNo">1219</span>                        if (decrypted != null) {<a name="line.1219"></a>
+<span class="sourceLineNo">1220</span>                            omemoManager.notifyOmemoMucMessageReceived(muc, senderDevice.getJid(), decrypted.getBody(),<a name="line.1220"></a>
+<span class="sourceLineNo">1221</span>                                    (Message) stanza, null, messageInfo);<a name="line.1221"></a>
+<span class="sourceLineNo">1222</span>                        }<a name="line.1222"></a>
+<span class="sourceLineNo">1223</span><a name="line.1223"></a>
+<span class="sourceLineNo">1224</span>                    } else if (omemoMessage.isKeyTransportElement()) {<a name="line.1224"></a>
+<span class="sourceLineNo">1225</span><a name="line.1225"></a>
+<span class="sourceLineNo">1226</span>                        CipherAndAuthTag cipherAndAuthTag = decryptTransportedOmemoKey(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1226"></a>
+<span class="sourceLineNo">1227</span>                        if (cipherAndAuthTag != null) {<a name="line.1227"></a>
+<span class="sourceLineNo">1228</span>                            omemoManager.notifyOmemoMucKeyTransportMessageReceived(muc, senderDevice.getJid(), cipherAndAuthTag,<a name="line.1228"></a>
+<span class="sourceLineNo">1229</span>                                    (Message) stanza, null, messageInfo);<a name="line.1229"></a>
+<span class="sourceLineNo">1230</span>                        }<a name="line.1230"></a>
+<span class="sourceLineNo">1231</span>                    }<a name="line.1231"></a>
+<span class="sourceLineNo">1232</span>                }<a name="line.1232"></a>
+<span class="sourceLineNo">1233</span>                // ... or a normal chat message...<a name="line.1233"></a>
+<span class="sourceLineNo">1234</span>                else {<a name="line.1234"></a>
+<span class="sourceLineNo">1235</span>                    if (omemoMessage.isMessageElement()) {<a name="line.1235"></a>
+<span class="sourceLineNo">1236</span><a name="line.1236"></a>
+<span class="sourceLineNo">1237</span>                        decrypted = service.processReceivingMessage(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1237"></a>
+<span class="sourceLineNo">1238</span>                        if (decrypted != null) {<a name="line.1238"></a>
+<span class="sourceLineNo">1239</span>                            omemoManager.notifyOmemoMessageReceived(decrypted.getBody(), (Message) stanza, null, messageInfo);<a name="line.1239"></a>
+<span class="sourceLineNo">1240</span>                        }<a name="line.1240"></a>
+<span class="sourceLineNo">1241</span><a name="line.1241"></a>
+<span class="sourceLineNo">1242</span>                    } else if (omemoMessage.isKeyTransportElement()) {<a name="line.1242"></a>
+<span class="sourceLineNo">1243</span><a name="line.1243"></a>
+<span class="sourceLineNo">1244</span>                        CipherAndAuthTag cipherAndAuthTag = decryptTransportedOmemoKey(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1244"></a>
+<span class="sourceLineNo">1245</span>                        if (cipherAndAuthTag != null) {<a name="line.1245"></a>
+<span class="sourceLineNo">1246</span>                            omemoManager.notifyOmemoKeyTransportMessageReceived(cipherAndAuthTag, (Message) stanza, null, messageInfo);<a name="line.1246"></a>
+<span class="sourceLineNo">1247</span>                        }<a name="line.1247"></a>
+<span class="sourceLineNo">1248</span>                    }<a name="line.1248"></a>
+<span class="sourceLineNo">1249</span>                }<a name="line.1249"></a>
+<span class="sourceLineNo">1250</span><a name="line.1250"></a>
+<span class="sourceLineNo">1251</span>            } catch (CryptoFailedException | CorruptedOmemoKeyException | InterruptedException | SmackException.NotConnectedException | XMPPException.XMPPErrorException | SmackException.NoResponseException e) {<a name="line.1251"></a>
+<span class="sourceLineNo">1252</span>                LOGGER.log(Level.WARNING, "internal omemoMessageListener failed to decrypt incoming OMEMO message: "<a name="line.1252"></a>
+<span class="sourceLineNo">1253</span>                        + e.getMessage());<a name="line.1253"></a>
+<span class="sourceLineNo">1254</span><a name="line.1254"></a>
+<span class="sourceLineNo">1255</span>            } catch (NoRawSessionException e) {<a name="line.1255"></a>
+<span class="sourceLineNo">1256</span>                try {<a name="line.1256"></a>
+<span class="sourceLineNo">1257</span>                    LOGGER.log(Level.INFO, "Received message with invalid session from " +<a name="line.1257"></a>
+<span class="sourceLineNo">1258</span>                            senderDevice + ". Send RatchetUpdateMessage.");<a name="line.1258"></a>
+<span class="sourceLineNo">1259</span>                    service.sendOmemoRatchetUpdateMessage(omemoManager, senderDevice, true);<a name="line.1259"></a>
+<span class="sourceLineNo">1260</span><a name="line.1260"></a>
+<span class="sourceLineNo">1261</span>                } catch (UndecidedOmemoIdentityException | CorruptedOmemoKeyException | CannotEstablishOmemoSessionException | CryptoFailedException e1) {<a name="line.1261"></a>
+<span class="sourceLineNo">1262</span>                    LOGGER.log(Level.WARNING, "internal omemoMessageListener failed to establish a session for incoming OMEMO message: "<a name="line.1262"></a>
+<span class="sourceLineNo">1263</span>                            + e.getMessage());<a name="line.1263"></a>
+<span class="sourceLineNo">1264</span>                }<a name="line.1264"></a>
+<span class="sourceLineNo">1265</span>            }<a name="line.1265"></a>
+<span class="sourceLineNo">1266</span>        }<a name="line.1266"></a>
+<span class="sourceLineNo">1267</span>    }<a name="line.1267"></a>
+<span class="sourceLineNo">1268</span><a name="line.1268"></a>
+<span class="sourceLineNo">1269</span>    OmemoCarbonCopyListener createOmemoCarbonCopyListener(OmemoManager omemoManager) {<a name="line.1269"></a>
+<span class="sourceLineNo">1270</span>        return new OmemoCarbonCopyListener(omemoManager, this, omemoStanzaFilter);<a name="line.1270"></a>
+<span class="sourceLineNo">1271</span>    }<a name="line.1271"></a>
+<span class="sourceLineNo">1272</span><a name="line.1272"></a>
+<span class="sourceLineNo">1273</span>    /**<a name="line.1273"></a>
+<span class="sourceLineNo">1274</span>     * StanzaListener that listens for incoming OmemoElements that ARE sent in carbons.<a name="line.1274"></a>
+<span class="sourceLineNo">1275</span>     */<a name="line.1275"></a>
+<span class="sourceLineNo">1276</span>    class OmemoCarbonCopyListener implements CarbonCopyReceivedListener {<a name="line.1276"></a>
+<span class="sourceLineNo">1277</span><a name="line.1277"></a>
+<span class="sourceLineNo">1278</span>        private final OmemoManager omemoManager;<a name="line.1278"></a>
+<span class="sourceLineNo">1279</span>        private final OmemoService&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; service;<a name="line.1279"></a>
+<span class="sourceLineNo">1280</span>        private final StanzaFilter filter;<a name="line.1280"></a>
+<span class="sourceLineNo">1281</span><a name="line.1281"></a>
+<span class="sourceLineNo">1282</span>        OmemoCarbonCopyListener(OmemoManager omemoManager,<a name="line.1282"></a>
+<span class="sourceLineNo">1283</span>                                       OmemoService&lt;T_IdKeyPair, T_IdKey, T_PreKey, T_SigPreKey, T_Sess, T_Addr, T_ECPub, T_Bundle, T_Ciph&gt; service,<a name="line.1283"></a>
+<span class="sourceLineNo">1284</span>                                       StanzaFilter filter) {<a name="line.1284"></a>
+<span class="sourceLineNo">1285</span>            this.omemoManager = omemoManager;<a name="line.1285"></a>
+<span class="sourceLineNo">1286</span>            this.service = service;<a name="line.1286"></a>
+<span class="sourceLineNo">1287</span>            this.filter = filter;<a name="line.1287"></a>
+<span class="sourceLineNo">1288</span>        }<a name="line.1288"></a>
+<span class="sourceLineNo">1289</span><a name="line.1289"></a>
+<span class="sourceLineNo">1290</span>        @Override<a name="line.1290"></a>
+<span class="sourceLineNo">1291</span>        public void onCarbonCopyReceived(CarbonExtension.Direction direction, Message carbonCopy, Message wrappingMessage) {<a name="line.1291"></a>
+<span class="sourceLineNo">1292</span>            if (filter.accept(carbonCopy)) {<a name="line.1292"></a>
+<span class="sourceLineNo">1293</span>                final OmemoDevice senderDevice = getSender(omemoManager, carbonCopy);<a name="line.1293"></a>
+<span class="sourceLineNo">1294</span>                Message decrypted;<a name="line.1294"></a>
+<span class="sourceLineNo">1295</span>                MultiUserChatManager mucm = MultiUserChatManager.getInstanceFor(omemoManager.getConnection());<a name="line.1295"></a>
+<span class="sourceLineNo">1296</span>                OmemoElement omemoMessage = carbonCopy.getExtension(OmemoElement.ENCRYPTED, OMEMO_NAMESPACE_V_AXOLOTL);<a name="line.1296"></a>
+<span class="sourceLineNo">1297</span>                OmemoMessageInformation messageInfo = new OmemoMessageInformation();<a name="line.1297"></a>
+<span class="sourceLineNo">1298</span><a name="line.1298"></a>
+<span class="sourceLineNo">1299</span>                if (CarbonExtension.Direction.received.equals(direction)) {<a name="line.1299"></a>
+<span class="sourceLineNo">1300</span>                    messageInfo.setCarbon(OmemoMessageInformation.CARBON.RECV);<a name="line.1300"></a>
+<span class="sourceLineNo">1301</span>                } else {<a name="line.1301"></a>
+<span class="sourceLineNo">1302</span>                    messageInfo.setCarbon(OmemoMessageInformation.CARBON.SENT);<a name="line.1302"></a>
+<span class="sourceLineNo">1303</span>                }<a name="line.1303"></a>
+<span class="sourceLineNo">1304</span><a name="line.1304"></a>
+<span class="sourceLineNo">1305</span>                try {<a name="line.1305"></a>
+<span class="sourceLineNo">1306</span>                    // Is it a MUC message...<a name="line.1306"></a>
+<span class="sourceLineNo">1307</span>                    if (isMucMessage(omemoManager, carbonCopy)) {<a name="line.1307"></a>
+<span class="sourceLineNo">1308</span><a name="line.1308"></a>
+<span class="sourceLineNo">1309</span>                        MultiUserChat muc = mucm.getMultiUserChat(carbonCopy.getFrom().asEntityBareJidIfPossible());<a name="line.1309"></a>
+<span class="sourceLineNo">1310</span>                        if (omemoMessage.isMessageElement()) {<a name="line.1310"></a>
+<span class="sourceLineNo">1311</span><a name="line.1311"></a>
+<span class="sourceLineNo">1312</span>                            decrypted = processReceivingMessage(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1312"></a>
+<span class="sourceLineNo">1313</span>                            if (decrypted != null) {<a name="line.1313"></a>
+<span class="sourceLineNo">1314</span>                                omemoManager.notifyOmemoMucMessageReceived(muc, senderDevice.getJid(), decrypted.getBody(),<a name="line.1314"></a>
+<span class="sourceLineNo">1315</span>                                        carbonCopy, wrappingMessage, messageInfo);<a name="line.1315"></a>
+<span class="sourceLineNo">1316</span>                            }<a name="line.1316"></a>
+<span class="sourceLineNo">1317</span><a name="line.1317"></a>
+<span class="sourceLineNo">1318</span>                        } else if (omemoMessage.isKeyTransportElement()) {<a name="line.1318"></a>
+<span class="sourceLineNo">1319</span><a name="line.1319"></a>
+<span class="sourceLineNo">1320</span>                            CipherAndAuthTag cipherAndAuthTag = decryptTransportedOmemoKey(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1320"></a>
+<span class="sourceLineNo">1321</span>                            if (cipherAndAuthTag != null) {<a name="line.1321"></a>
+<span class="sourceLineNo">1322</span>                                omemoManager.notifyOmemoMucKeyTransportMessageReceived(muc, senderDevice.getJid(), cipherAndAuthTag,<a name="line.1322"></a>
+<span class="sourceLineNo">1323</span>                                        carbonCopy, wrappingMessage, messageInfo);<a name="line.1323"></a>
+<span class="sourceLineNo">1324</span>                            }<a name="line.1324"></a>
+<span class="sourceLineNo">1325</span>                        }<a name="line.1325"></a>
+<span class="sourceLineNo">1326</span>                    }<a name="line.1326"></a>
+<span class="sourceLineNo">1327</span>                    // ... or a normal chat message...<a name="line.1327"></a>
+<span class="sourceLineNo">1328</span>                    else {<a name="line.1328"></a>
+<span class="sourceLineNo">1329</span>                        if (omemoMessage.isMessageElement()) {<a name="line.1329"></a>
+<span class="sourceLineNo">1330</span><a name="line.1330"></a>
+<span class="sourceLineNo">1331</span>                            decrypted = service.processReceivingMessage(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1331"></a>
+<span class="sourceLineNo">1332</span>                            if (decrypted != null) {<a name="line.1332"></a>
+<span class="sourceLineNo">1333</span>                                omemoManager.notifyOmemoMessageReceived(decrypted.getBody(), carbonCopy, null, messageInfo);<a name="line.1333"></a>
+<span class="sourceLineNo">1334</span>                            }<a name="line.1334"></a>
+<span class="sourceLineNo">1335</span><a name="line.1335"></a>
+<span class="sourceLineNo">1336</span>                        } else if (omemoMessage.isKeyTransportElement()) {<a name="line.1336"></a>
+<span class="sourceLineNo">1337</span><a name="line.1337"></a>
+<span class="sourceLineNo">1338</span>                            CipherAndAuthTag cipherAndAuthTag = decryptTransportedOmemoKey(omemoManager, senderDevice, omemoMessage, messageInfo);<a name="line.1338"></a>
+<span class="sourceLineNo">1339</span>                            if (cipherAndAuthTag != null) {<a name="line.1339"></a>
+<span class="sourceLineNo">1340</span>                                omemoManager.notifyOmemoKeyTransportMessageReceived(cipherAndAuthTag, carbonCopy, null, messageInfo);<a name="line.1340"></a>
+<span class="sourceLineNo">1341</span>                            }<a name="line.1341"></a>
+<span class="sourceLineNo">1342</span>                        }<a name="line.1342"></a>
+<span class="sourceLineNo">1343</span>                    }<a name="line.1343"></a>
+<span class="sourceLineNo">1344</span><a name="line.1344"></a>
+<span class="sourceLineNo">1345</span>                } catch (CryptoFailedException | CorruptedOmemoKeyException | InterruptedException | SmackException.NotConnectedException | XMPPException.XMPPErrorException | SmackException.NoResponseException e) {<a name="line.1345"></a>
+<span class="sourceLineNo">1346</span>                    LOGGER.log(Level.WARNING, "internal omemoMessageListener failed to decrypt incoming OMEMO carbon copy: "<a name="line.1346"></a>
+<span class="sourceLineNo">1347</span>                            + e.getMessage());<a name="line.1347"></a>
+<span class="sourceLineNo">1348</span><a name="line.1348"></a>
+<span class="sourceLineNo">1349</span>                } catch (final NoRawSessionException e) {<a name="line.1349"></a>
+<span class="sourceLineNo">1350</span>                    Async.go(new Runnable() {<a name="line.1350"></a>
+<span class="sourceLineNo">1351</span>                        @Override<a name="line.1351"></a>
+<span class="sourceLineNo">1352</span>                        public void run() {<a name="line.1352"></a>
+<span class="sourceLineNo">1353</span>                            try {<a name="line.1353"></a>
+<span class="sourceLineNo">1354</span>                                LOGGER.log(Level.INFO, "Received OMEMO carbon copy message with invalid session from " +<a name="line.1354"></a>
+<span class="sourceLineNo">1355</span>                                        senderDevice + ". Send RatchetUpdateMessage.");<a name="line.1355"></a>
+<span class="sourceLineNo">1356</span>                                service.sendOmemoRatchetUpdateMessage(omemoManager, senderDevice, true);<a name="line.1356"></a>
+<span class="sourceLineNo">1357</span><a name="line.1357"></a>
+<span class="sourceLineNo">1358</span>                            } catch (UndecidedOmemoIdentityException | CorruptedOmemoKeyException | CannotEstablishOmemoSessionException | CryptoFailedException e1) {<a name="line.1358"></a>
+<span class="sourceLineNo">1359</span>                                LOGGER.log(Level.WARNING, "internal omemoMessageListener failed to establish a session for incoming OMEMO carbon message: "<a name="line.1359"></a>
+<span class="sourceLineNo">1360</span>                                        + e.getMessage());<a name="line.1360"></a>
+<span class="sourceLineNo">1361</span>                            }<a name="line.1361"></a>
+<span class="sourceLineNo">1362</span>                        }<a name="line.1362"></a>
+<span class="sourceLineNo">1363</span>                    });<a name="line.1363"></a>
+<span class="sourceLineNo">1364</span><a name="line.1364"></a>
+<span class="sourceLineNo">1365</span>                }<a name="line.1365"></a>
+<span class="sourceLineNo">1366</span>            }<a name="line.1366"></a>
+<span class="sourceLineNo">1367</span>        }<a name="line.1367"></a>
+<span class="sourceLineNo">1368</span>    }<a name="line.1368"></a>
+<span class="sourceLineNo">1369</span>}<a name="line.1369"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>

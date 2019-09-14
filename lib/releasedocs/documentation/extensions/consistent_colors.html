@@ -1,0 +1,9 @@
+<h1>Consistent Colors</h1><p><a href="index.html">Back</a></p><p>Since XMPP can be used on multiple platforms at the same time, it might be a good idea to render given Strings like nicknames in the same color on all platforms to provide a consistent user experience.</p><p>The utility class <code>ConsistentColor</code> allows the generation of colors to a given string following the specification of <a href="https://xmpp.org/extensions/xep-0392.html">XEP-0392</a>.</p><h2>Usage</h2><p>To generate a consistent color for a given string, call <code>
+float[] rgb = ConsistentColor.RGBFrom(input);
+</code> The resulting float array contains values for RGB in the range of 0 to 1.</p><h2>Color Deficiency Corrections</h2><p>Some users might suffer from color vision deficiencies. To compensate those deficiencies, the API allows for color correction. The color correction mode is a static value, which can be changed at any time.</p><p>To correct colors for users with red-green color deficiency use the following code: <code>
+ConsistentColor.activateRedGreenBlindnessCorrection();
+</code></p><p>For color correction for users with blue-blindness, call <code>
+ConsistentColor.activateBlueBlindnessCorrection();
+</code></p><p>To deactivate color vision deficiency correction, call <code>
+ConsistentColor.deactivateDeficiencyCorrection();
+</code></p>

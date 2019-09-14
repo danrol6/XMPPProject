@@ -1,0 +1,79 @@
+<h1>Encrypting messages with OMEMO</h1><p><a href="index.html">Back</a></p><p>OMEMO (<a href="https://xmpp.org/extensions/xep-0384.html">XEP-0384</a>) is an adaption of the Signal protocol for XMPP. It provides an important set of cryptographic properties including but not restricted to</p>
+<ul>
+  <li>Confidentiality</li>
+  <li>Integrity</li>
+  <li>Authenticity</li>
+  <li>Forward secrecy</li>
+  <li>Future secrecy (break-in recovery)</li>
+  <li>Plausible deniability</li>
+</ul><p>Contrary to OTR it is capable of multi-end-to-multi-end encryption and message synchronization across multiple devices. It also allows the sender to send a message while the recipient is offline.</p><p>It does NOT provide a server side message archive, so that a new device could fetch old chat history.</p><p>Most implementations of OMEMO use the signal-protocol libraries provided by OpenWhisperSystems. Unlike Smack, those libraries are licensed under the GPL, which prevents a Apache licensed OMEMO implementation using those libraries (see <a href="https://github.com/igniterealtime/Smack/wiki/OMEMO-libsignal-Licensing-Situation">licensing situation</a>). The module smack-omemo therefore contains no code related to signal-protocol. However, almost all functionality is encapsulated in that module. If you want to use OMEMO in a GPL client, you can use the smack-omemo-signal Smack module, which binds the signal-protocol library to smack-omemo. It is also possible, to port smack-omemo to other libraries implementing the double ratchet algorithm.</p><h2>Requirements</h2><p>In order to use OMEMO encryption, your server and the servers of your chat partners must support PEP (<a href="http://xmpp.org/extensions/xep-0163.html">XEP-0163</a>) to store and exchange key bundles. Optionally your server should support Message Carbons (<a href="http://xmpp.org/extensions/xep-0280.html">XEP-0280</a>) and Message Archive Management (<a href="http://xmpp.org/extensions/xep-0313.html">XEP-0313</a>) to achieve message synchronization across all (on- and offline) devices.</p><h2>Setup</h2><p>First you need to setup a OmemoService, for example the libsignal one:</p>
+<pre><code>SignalOmemoService.setup();
+</code></pre><p>As a first step you have to prepare the OmemoStore. You can either use your own implementation, or use the builtin FileBasedOmemoStore (default). If you do not want to use your own store, the implementation uses a file based store, so you HAVE to set the default path.</p>
+<pre><code>//set path in case we want to use a file-based store (default)
+OmemoConfiguration.setFileBasedOmemoStoreDefaultPath(new File(&quot;path/to/your/store&quot;));
+</code></pre><p>For each device you need an OmemoManager. In this example, we use the smack-omemo-signal implementation, so we use the SignalOmemoService as OmemoService. The OmemoManager must be initialized with either a deviceId (of an existing device), or null in case you want to generate a fresh device. The OmemoManager can be used to execute OMEMO related actions like sending a message etc. If you don't pass a deviceId, the value of defaultDeviceId will be used if present.</p>
+<pre><code>OmemoManager omemoManager = OmemoManager.getInstanceFor(connection);
+</code></pre><p>As soon as the connection is authenticated, the module generates some keys and announces OMEMO support. To get updated with new OMEMO messages, you should register message listeners.</p>
+<pre><code>omemoManager.addOmemoMessageListener(new OmemoMessageListener() {
+    @Overwrite
+    public void omOmemoMessageReceived(String decryptedBody, Message encryptedMessage, Message wrappingMessage, OmemoMessageInformation omemoInformation) {
+        System.out.println(decryptedBody);
+    }
+});
+
+omemoManager.addOmemoMucMessageListener(new OmemoMucMessageListener() {
+    @Overwrite
+    public void onOmemoMucMessageReceived(MultiUserChat muc, BareJid from, String decryptedBody, Message message,
+                                          Message wrappingMessage, OmemoMessageInformation omemoInformation) {
+        System.out.println(decryptedBody);
+    }
+});
+</code></pre><h2>Usage</h2><p>Before you can encrypt a message for a device, you have to trust its identity. smack-omemo will throw an UndecidedOmemoIdentityException whenever you try to send a message to a device, which the user has not yet decided to trust or distrust.</p>
+<pre><code>omemoManager.trustOmemoIdentity(trustedDevice, trustedFingerprint);
+omemoManager.distrustOmemoIdentity(untrustedDevice, untrustedFingerprint);
+</code></pre><p>The trust decision should be made by the user based on comparing fingerprints. You can get fingerprints of your own and contacts devices:</p>
+<pre><code>OmemoFingerprint myFingerprint = omemoManager.getFingerprint();
+OmemoFingerprint otherFingerprint = omemoStore.getFingerprint(omemoManager, otherDevice);
+</code></pre><p>To encrypt a message for a single contact or a MUC, you do as follows:</p>
+<pre><code>Message encryptedSingleMessage = omemoManager.encrypt(bobsBareJid, &quot;Hi Bob!&quot;);
+
+Message encryptedMucMessage = omemoManager.encrypt(multiUserChat, &quot;Hi everybody!&quot;);
+</code></pre><p>Note: It may happen, that smack-omemo is unable to create a session with a device. In case we could not create a single valid session for a recipient, a CannotCreateOmemoSessionException will be thrown. This exception contains information about which sessions could (not) be created and why. If you want to ignore those devices, you can encrypt the message for all remaining devices like this:</p>
+<pre><code>Message encryptedMessage = omemoManager.encryptForExistingSession(cannotEstablishSessionException, &quot;Hi there!&quot;);
+</code></pre><p>The resulting message can then be sent via the ChatManager/MultiUserChatManager.</p><p>You may want to generate a new identity sometime in the future. That's pretty straight forward. No need to manually publish bundles etc.</p>
+<pre><code>omemoManager.regenerate();
+</code></pre><p>In case your device list gets filled with old unused identities, you can clean it up. This will remove all active devices from the device list and only publish the device you are using right now.</p>
+<pre><code>omemoManager.purgeDevices();
+</code></pre><p>If you want to find out, whether a server, MUC or contacts resource supports OMEMO, you can use the following methods:</p>
+<pre><code>boolean serverCan = omemoManager.serverSupportsOmemo(serverJid);
+boolean mucCan = omemoManager.multiUserChatSupportsOmemo(mucJid);
+boolean resourceCan = omemoManager.resourceSupportsOmemo(contactsResourceJid);
+</code></pre><p>It might happen, that the server you or your contact are using is not delivering devicelist updates correctly. In such a case smack-omemo cannot fetch bundles or send messages to devices it hasn&#39;t seen before. To mitigate this, it might help to explicitly request the latest device list from the server. <code>
+omemoManager.requestDeviceListUpdateFor(contactJid);
+</code></p><p>If you want to decrypt a MamQueryResult, you can do so using the following method: <code>
+List&lt;ClearTextMessage&gt; decryptedMamQuery = omemoManager.decryptMamQueryResult(mamQueryResult);
+</code> Note, that you cannot decrypt an OMEMO encrypted message twice for reasons of forward secrecy. A ClearTextMessage contains the decrypted body of the message, as well as additional information like if/how the message was encrypted in the first place. Unfortunately due to the fact that you cannot decrypt messages twice, you have to keep track of the message history locally on the device and ideally also keep track of the last received message, so you can query the server only for messages newer than that.</p><h2>Configuration</h2><p>smack-omemo has some configuration options that can be changed on runtime via the <code>OmemoConfiguration</code> class:</p>
+<ul>
+  <li>setFileBasedOmemoStoreDefaultPath sets the default directory for the FileBasedOmemoStore implementations.</li>
+  <li>setIgnoreStaleDevices when set to true, smack-omemo will stop encrypting messages for <strong>own</strong> devices that have not send a message for some period of time (configurable in setIgnoreStaleDevicesAfterHours)</li>
+  <li>setDeleteStaleDevices when set to true, smack-omemo will remove own devices from the device list, if no messages were received from them for a period of time (configurable in setDeleteStaleDevicesAfterHours)</li>
+  <li>setRenewOldSignedPreKeys when set to true, smack-omemo will periodically generate and publish new signed prekeys. Via setRenewOldSignedPreKeysAfterHours you can configure, after what period of time new keys are generated and setMaxNumberOfStoredSignedPreKeys allows configuration of how many signed PreKeys are kept in storage for decryption of delayed messages.</li>
+  <li>setAddOmemoBodyHint when set to true, a plaintext body with a hint about OMEMO encryption will be added to the message. This hint will be displayed by clients that do not support OMEMO. Note that this might not be desirable when communicating with clients that do not support EME.</li>
+  <li>setAddEmeEncryptionHint when set to true, an Explicit Message Encryption element will be added to the message. This element tells clients, that the message is encrypted with OMEMO.</li>
+  <li>setAddMAMStorageProcessingHint when set to true, a storage hint for Message Archive Management will be added to the message. This enabled servers to store messages that contain no body.</li>
+</ul><h2>Customization</h2><p>You can integrate smack-omemo with your existing infrastructure. It is possible to create your own OmemoStore implementations eg. using an SQL database as backend. For this purpose, just inherit OmemoStore/SignalOmemoStore and implement the missing methods. You can register that Store with your OmemoService by calling <code>
+SignalOmemoService.getInstance().setOmemoStoreBackend(myStore);
+</code></p><h2>Features</h2>
+<ul>
+  <li>decryption and encryption of OMEMO messages (single and multi user chat)</li>
+  <li>provides information about trust status of incoming messages</li>
+  <li>automatic publishing of bundle</li>
+  <li>automatic merging of incoming deviceList updates</li>
+  <li>ignores stale devices after period of inactivity</li>
+  <li>removes stale devices from device list after period of inactivity</li>
+  <li>automatic repair of broken sessions through ratchet update messages</li>
+  <li>automatic renewal of signed preKeys</li>
+  <li>multiple devices per connection possible</li>
+</ul><h2>Integration Tests</h2><p>smack-omemo comes with a set of integration tests. Lets say you want to run the integration test suite for smack-omemo-signal. You can do so by using the following gradle task:</p>
+<pre><code>gradle omemoSignalIntTest
+</code></pre>

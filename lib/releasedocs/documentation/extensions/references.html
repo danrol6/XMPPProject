@@ -1,0 +1,5 @@
+<h1>References</h1><p><a href="index.html">Back</a></p><p>References are a way to refer to other entities like users, other messages or external data from within a message.</p><p>Typical use-cases are mentioning other users by name, but referencing to their BareJid, or linking to a sent file.</p><h2>Usage</h2><p>Mention a user and link to their bare jid. <code>
+Message message = new Message(&quot;Alice is a realy nice person.&quot;);
+BareJid alice = JidCreate.bareFrom(&quot;alice@capulet.lit&quot;);
+ReferenceManager.addMention(message, 0, 5, alice);
+</code></p><p>TODO: Add more use cases (for example for MIX, SIMS...)</p>

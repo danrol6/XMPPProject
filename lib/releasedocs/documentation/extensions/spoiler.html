@@ -1,0 +1,5 @@
+<h1>Spoiler Messages</h1><p><a href="index.html">Back</a></p><p>Spoiler Messages can be used to indicate that the body of a message is a spoiler and should be displayed as such.</p><h2>Usage</h2><p>To get an instance of the SpoilerManager, call <code>
+SpoilerManager manager = SpoilerManager.getInstanceFor(connection);
+</code> This will automatically add Spoilers to the list of supported features of your client.</p><p>The manager can then be used to add SpoilerElements to messages like follows: ``` Message message = new Message();</p><p>// spoiler without hint SpoilerElement.addSpoiler(message);</p><p>// spoiler with hint about content SpoilerElement.addSpoiler(message, "End of Love Story");</p><p>// spoiler with localized hint SpoilerElement.addSpoiler(message, "de", "Der Kuchen ist eine Lüge"); ```</p><p>To get Spoilers from a message call <code>
+Map&lt;String, String&gt; spoilers = SpoilerElement.getSpoilers(message);
+</code></p>
